@@ -61,7 +61,7 @@ function normalize(value: CoachSettings): CoachSettings {
   const frequency = ["quiet", "balanced", "active"].includes(value.speechFrequency) ? value.speechFrequency : "balanced";
   return {
     driverName: String(value.driverName ?? "").trim().replace(/[^\p{L}\p{M}' -]/gu, "").slice(0, 40),
-    swearingLevel: Math.round(n(value.swearingLevel, 0, 3, 0)),
+    swearingLevel: Math.round(n(value.swearingLevel, 0, 4, 0)),
     voiceEngine: value.voiceEngine === "system" ? "system" : "neural",
     neuralVoice: ["am_fenrir", "am_michael", "af_heart", "af_bella"].includes(value.neuralVoice) ? value.neuralVoice : "af_heart",
     spotterVoice: ["am_fenrir", "am_michael", "af_heart", "af_bella"].includes(value.spotterVoice) ? value.spotterVoice : "am_fenrir",

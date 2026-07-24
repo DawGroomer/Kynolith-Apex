@@ -14,7 +14,7 @@ test("settings persist and clamp unsafe values", async () => {
   assert.equal(updated.voiceVolume, 1);
   assert.equal(updated.voiceRate, .8);
   assert.equal(updated.controllerButton, 9);
-  assert.equal(updated.swearingLevel, 3);
+  assert.equal(updated.swearingLevel, 4);
   const reloaded = new SettingsStore(file); await reloaded.initialize();
   assert.equal(reloaded.get().speechFrequency, "active");
   assert.equal(spacingFor("quiet"), 12_000);

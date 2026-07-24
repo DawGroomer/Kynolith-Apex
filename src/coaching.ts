@@ -20,6 +20,7 @@ export class CoachingEngine {
   private strategyCoach = new StrategyCoach();
   private leftSeen = 0; private rightSeen = 0; private leftClear = 0; private rightClear = 0;
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
+  private lastImpactTimestamp = 0; private impactInitialized = false; private spinSeen = 0; private spinClear = 0; private spinActive = false; private lastIncidentAt = 0;
 
   setInstructionMode(mode: "quiet" | "balanced" | "active"): void {
     this.instructionMode = mode;
@@ -41,14 +42,31 @@ export class CoachingEngine {
     if (this.rightSeen === 3 && !this.carRightActive) { this.carRightActive = true; this.emit(cues, frame, "car-right", 3_000, "critical", "racecraft", "Car right. Hold your line."); }
     if (this.leftClear === 12 && this.carLeftActive) { this.carLeftActive = false; this.emit(cues, frame, "clear-left", 3_000, "critical", "racecraft", "Clear left."); }
     if (this.rightClear === 12 && this.carRightActive) { this.carRightActive = false; this.emit(cues, frame, "clear-right", 3_000, "critical", "racecraft", "Clear right."); }
+    const newImpact = this.impactInitialized && (frame.impactTimestamp ?? 0) > this.lastImpactTimestamp && (frame.impactMagnitude ?? 0) >= 3;
+    this.lastImpactTimestamp = Math.max(this.lastImpactTimestamp, frame.impactTimestamp ?? 0);
+    this.impactInitialized = true;
+    const lateralSpeed = Math.abs(frame.lateralSpeedKph ?? 0);
+    const spinning = frame.speedKph > 25 && lateralSpeed > Math.max(22, frame.speedKph * .28);
+    this.spinSeen = spinning ? this.spinSeen + 1 : 0;
+    this.spinClear = spinning ? 0 : this.spinClear + 1;
+    if (newImpact) {
+      this.lastIncidentAt = frame.timestamp;
+      this.emit(cues, frame, "impact", 5_000, "critical", "safety", "Impact. Hold the brakes. Check traffic, then rejoin safely.");
+    } else if (this.spinSeen === 2 && !this.spinActive) {
+      this.spinActive = true;
+      this.lastIncidentAt = frame.timestamp;
+      this.emit(cues, frame, "spin", 5_000, "critical", "safety", "Spin. Hold the brakes. Stabilize the car, then rejoin safely.");
+    }
+    if (this.spinClear >= 20) this.spinActive = false;
+    const incidentActive = frame.timestamp - this.lastIncidentAt < 8_000;
     this.offTrackSeen = frame.offTrackWheels >= 2 ? this.offTrackSeen + 1 : 0;
     this.offTrackClear = frame.offTrackWheels < 2 ? this.offTrackClear + 1 : 0;
-    if (this.offTrackSeen === 3 && !this.offTrackActive) { this.offTrackActive = true; this.emit(cues, frame, "track-edge", 0, "critical", "racecraft", "Track limits. Two wheels off—bring it back inside."); }
+    if (this.offTrackSeen === 3 && !this.offTrackActive) { this.offTrackActive = true; if (!incidentActive) this.emit(cues, frame, "track-edge", 0, "critical", "racecraft", "Track limits. Two wheels off—bring it back inside."); }
     if (this.offTrackClear >= 20 && this.offTrackActive) this.offTrackActive = false;
-    if (this.trackLimitsInitialized && frame.trackLimitsSteps > this.lastTrackLimitsSteps) this.emit(cues, frame, "track-limits-step", 0, "critical", "racecraft", "Track limits violation. Keep the next one inside the white line.");
+    if (!incidentActive && this.trackLimitsInitialized && frame.trackLimitsSteps > this.lastTrackLimitsSteps) this.emit(cues, frame, "track-limits-step", 0, "critical", "racecraft", "Track limits violation. Keep the next one inside the white line.");
     this.lastTrackLimitsSteps = frame.trackLimitsSteps;
     this.trackLimitsInitialized = true;
-    if (frame.lapInvalidated && !this.lapInvalidated) this.emit(cues, frame, "lap-invalid", 0, "critical", "racecraft", "Lap invalidated for track limits. Reset and build the next lap cleanly.");
+    if (!incidentActive && frame.lapInvalidated && !this.lapInvalidated) this.emit(cues, frame, "lap-invalid", 0, "critical", "racecraft", "Lap invalidated for track limits. Reset and build the next lap cleanly.");
     this.lapInvalidated = frame.lapInvalidated;
     if (this.lastLap && frame.lap > this.lastLap) this.emit(cues, frame, `lap-${frame.lap}`, 0, "info", "lap", `Lap ${frame.lap}. Build it.`);
     this.lastLap = frame.lap;

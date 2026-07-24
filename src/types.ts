@@ -17,6 +17,9 @@ export interface TelemetryFrame {
   steering: number;
   lateralG: number;
   longitudinalG: number;
+  lateralSpeedKph?: number;
+  impactMagnitude?: number;
+  impactTimestamp?: number;
   fuelLiters: number;
   tireTempC: [number, number, number, number];
   tireWear: [number, number, number, number];

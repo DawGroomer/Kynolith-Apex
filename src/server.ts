@@ -13,6 +13,7 @@ import { buildDriverProfile } from "./driver-profile.js";
 import { analyzeSessionIntelligence } from "./track-intelligence.js";
 import { ReferenceStore } from "./reference-store.js";
 import { TrackModelStore } from "./track-model-store.js";
+import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 
 export interface CoachServerOptions {
@@ -157,7 +158,9 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
       if (level === 3 && frame.timestamp - lastStrongLanguageAt < 45_000) level = 2;
       else if (level === 3) lastStrongLanguageAt = frame.timestamp;
       const cornerCall = cue.id.startsWith("corner-review") || cue.id.startsWith("corner-clean");
-      if (!cornerCall) cue.message = applyTemper(cue.message, level, cue.id, cue.id.startsWith("clean-exit"));
+      const positive = cue.id.startsWith("corner-clean") || cue.id.startsWith("clean-exit");
+      if (cornerCall && level === 4) cue.message = applyRowdyCorner(cue.message, positive, cue.id);
+      else if (!cornerCall) cue.message = applyTemper(cue.message, level, cue.id, positive);
     }
     if (config.driverName && cue.priority === "technique" && shouldUseName(cue.id, frame.lap)) cue.message = personalize(cue.message, config.driverName);
     cue.speak = state.source === "lmu" && config.autoSpeak && allowedToSpeak(cue, config);
@@ -183,18 +186,6 @@ function shouldUseName(cueId: string, lap: number): boolean {
   return (cueId.length + lap) % 3 === 0;
 }
 
-function applyTemper(message: string, level: number, seed: string, positive = false): string {
-  if (level <= 0) return message;
-  if (positive) return level >= 2 ? `That's more like it. ${message}` : message;
-  const choices = level === 1
-    ? ["Come on, ", "Let's sharpen it up—"]
-    : level === 2
-      ? ["Damn it, ", "Come on, wake it up—"]
-      : ["For fuck's sake, ", "Damn it, ", "Stop throwing the damn corner away—", "Wake up and drive the thing—"];
-  const prefix = choices[hash(seed) % choices.length] ?? choices[0] ?? "";
-  return `${prefix}${message.charAt(0).toLowerCase()}${message.slice(1)}`;
-}
-
 function selectPersonalBest(sessions: import("./types.js").RecordedSession[]): { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null {
   let best: { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null = null;
   for (const session of sessions) for (const lap of session.summary.laps.filter(item => item.complete && item.durationSeconds > 20)) {
@@ -206,8 +197,6 @@ function selectPersonalBest(sessions: import("./types.js").RecordedSession[]): {
 }
 
 function formatLap(seconds: number): string { const minutes = Math.floor(seconds / 60); return `${minutes}:${(seconds - minutes * 60).toFixed(3).padStart(6, "0")}`; }
-
-function hash(value: string): number { let result = 0; for (const char of value) result = (result * 31 + char.charCodeAt(0)) >>> 0; return result; }
 
 const simulatorTimer = setInterval(() => { if (state.source === "simulator") void processFrame(simulatedFrame()); }, 100);
 wss.on("connection", socket => socket.send(JSON.stringify({ type: "state", state })));

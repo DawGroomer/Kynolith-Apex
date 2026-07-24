@@ -61,3 +61,20 @@ test("track limits does not retrigger from brief wheel-contact noise", () => {
   const noisy = [2, 2, 2].flatMap((offTrackWheels, i) => engine.ingest({ ...simulatedFrame(202_000 + i * 50), offTrackWheels }));
   assert.equal(noisy.some(cue => cue.id.startsWith("track-edge-")), false);
 });
+
+test("spin detection replaces the track-limits call with recovery guidance", () => {
+  const engine = new CoachingEngine();
+  engine.ingest({ ...simulatedFrame(300_000), speedKph: 100, lateralSpeedKph: 38, offTrackWheels: 2 });
+  const cues = engine.ingest({ ...simulatedFrame(300_050), speedKph: 85, lateralSpeedKph: 35, offTrackWheels: 2 });
+  const followup = engine.ingest({ ...simulatedFrame(300_100), speedKph: 60, lateralSpeedKph: 30, offTrackWheels: 2 });
+  assert.equal(cues.some(cue => cue.id.startsWith("spin-") && cue.category === "safety"), true);
+  assert.equal(followup.some(cue => cue.id.startsWith("track-edge-")), false);
+});
+
+test("impact telemetry produces crash recovery guidance", () => {
+  const engine = new CoachingEngine();
+  engine.ingest({ ...simulatedFrame(400_000), impactTimestamp: 10, impactMagnitude: 0 });
+  const cues = engine.ingest({ ...simulatedFrame(400_050), impactTimestamp: 11, impactMagnitude: 8, offTrackWheels: 4 });
+  assert.equal(cues.some(cue => cue.id.startsWith("impact-") && cue.message.startsWith("Impact.")), true);
+  assert.equal(cues.some(cue => cue.id.startsWith("track-edge-")), false);
+});

@@ -117,6 +117,7 @@ internal static class Program
             gear = car.mGear, rpm = car.mEngineRPM, throttle = Clamp01(car.mUnfilteredThrottle),
             brake = Clamp01(car.mUnfilteredBrake), steering = Math.Clamp(car.mUnfilteredSteering, -1, 1),
             lateralG = car.mLocalAccel.x / Gravity, longitudinalG = -car.mLocalAccel.z / Gravity,
+            lateralSpeedKph = car.mLocalVel.x * 3.6, impactMagnitude = car.mLastImpactMagnitude, impactTimestamp = car.mLastImpactET,
             fuelLiters = Math.Max(0, car.mFuel), tireTempC = tireTemps, tireWear, tirePressurePsi, brakeTempF,
             position = Math.Max(1, (int)playerScore.mPlace), classPosition, vehicleClass,
             gapAheadSeconds = ValidGap(car.mTimeGapCarAhead), gapBehindSeconds = ValidGap(car.mTimeGapCarBehind),
