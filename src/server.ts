@@ -15,7 +15,7 @@ import { ReferenceStore } from "./reference-store.js";
 import { TrackModelStore } from "./track-model-store.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
-import { ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
+import { MINIMUM_CALIBRATION_LABELS, ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
 import { convertReferenceFile } from "./reference-converter.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 
@@ -103,7 +103,7 @@ app.post("/api/telemetry/disconnect", async (_req, res) => {
 });
 app.get("/api/sessions", async (_req, res) => res.json(await recorder.list()));
 app.get("/api/profile", async (_req, res) => res.json(buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get())));
-app.get("/api/calibration", (_req, res) => res.json(calibration.get() ?? { status: "uncalibrated", minimumExpertLabels: 3 }));
+app.get("/api/calibration", (_req, res) => res.json(calibration.get() ?? { status: "uncalibrated", minimumExpertLabels: MINIMUM_CALIBRATION_LABELS, validatedExpertLabels: 30 }));
 app.post("/api/calibration/import", async (req, res) => {
   try { res.status(201).json(await calibration.import((req.body?.labels ?? []) as ExpertLabel[])); }
   catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid calibration labels" }); }

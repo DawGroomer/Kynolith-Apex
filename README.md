@@ -26,6 +26,10 @@ All driver-facing measurements use American units: miles per hour, gallons, PSI,
 
 Live LMU frames are downsampled to 10 Hz and stored under the desktop application's per-user data directory. When LMU disconnects or changes sessions, Apex creates a review containing lap times, average and maximum MPH, input-smoothness scores, throttle/brake traces, a track map, and every coaching call pinned to its lap and track percentage.
 
+Apex assigns every lap and session a versioned data-quality status: trusted, limited, or quarantined. Only continuous, representative, plausible laps affect progression, setup advice, strategy, and calibration. Limited and quarantined recordings remain visible for diagnosis but cannot inflate smoothness or depress the driver score. Existing recordings can be audited without modification using `pnpm data:quality -- <sessions-directory>`; add `--apply` to archive the original files and migrate their summaries.
+
+Score calibration requires at least 12 unique expert-labelled sessions with broad raw-score coverage. It remains provisional until 30 labels and reports cross-validated error, confidence, and warnings instead of silently treating a small label set as authoritative.
+
 ## Local voice
 
 Hold **HOLD TO TALK**, ask a question, then release. Apex uses quantized `onnx-community/whisper-tiny.en` and `onnx-community/Qwen3-0.6B-ONNX` weights locally. Immediate car-status questions are deterministic. Known LMU questions return vetted local guidance; unfamiliar wording is classified by Qwen into an allowed knowledge category, but generated model text is never used as a physics claim. This prevents the compact model from inventing setup ranges, BoP values, or current car state.

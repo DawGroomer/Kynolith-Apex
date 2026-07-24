@@ -8,6 +8,7 @@ export interface DriverProfile {
   components: { braking: number; throttle: number; consistency: number; pace: number } | null;
   currentFocus: string; history: Array<{ id: string; at: number; track: string; score: number }>;
   academy: DriverAcademy;
+  dataQuality: { totalSessions: number; trustedSessions: number; limitedSessions: number; quarantinedSessions: number; scoreConfidence: "low" | "moderate" | "high"; calibrationStatus: "uncalibrated" | "provisional" | "validated" };
 }
 
 export interface DriverAcademy {
@@ -25,9 +26,11 @@ export interface DriverAcademy {
 }
 
 export function buildDriverProfile(driverName: string, all: SessionSummary[], calibration: ScoreCalibration | null = null): DriverProfile {
-  const sessions = all.filter(session => session.laps.some(lap => lap.complete && lap.durationSeconds > 20));
+  const trustedSessions = all.filter(session => !session.quality || session.quality.status === "trusted");
+  const sessions = trustedSessions.filter(session => session.laps.some(lap => lap.complete && (!lap.quality || lap.quality.status === "trusted") && lap.durationSeconds > 20));
+  const dataQuality = qualitySummary(all, sessions.length, calibration);
   if (!sessions.length) return { driverName: driverName || "Driver", score: null, change: null, trend: "new", level: "Rookie",
-    sessions: 0, completedLaps: 0, personalBests: 0, components: null, currentFocus: "Complete a clean timed session to establish your baseline.", history: [], academy: emptyAcademy() };
+    sessions: 0, completedLaps: 0, personalBests: 0, components: null, currentFocus: "Complete a trusted clean timed session to establish your baseline.", history: [], academy: emptyAcademy(), dataQuality };
   const bestByCombo = new Map<string, number>();
   for (const session of sessions) if (session.fastestLapSeconds) {
     const key = `${session.track}|${session.vehicle}`; bestByCombo.set(key, Math.min(bestByCombo.get(key) ?? Infinity, session.fastestLapSeconds));
@@ -43,7 +46,7 @@ export function buildDriverProfile(driverName: string, all: SessionSummary[], ca
     trend: change === null ? "new" : change > 1 ? "improved" : change < -1 ? "declined" : "steady",
     level: academy.rank, sessions: sessions.length, completedLaps,
     personalBests: bestByCombo.size, components: latest.components, currentFocus: latest.session.primaryFocus,
-    history: scored.slice(0, 10).reverse().map(entry => ({ id: entry.session.id, at: entry.session.startedAt, track: entry.session.track, score: entry.score })), academy
+    history: scored.slice(0, 10).reverse().map(entry => ({ id: entry.session.id, at: entry.session.startedAt, track: entry.session.track, score: entry.score })), academy, dataQuality
   };
 }
 
@@ -92,13 +95,21 @@ function emptyAcademy(): DriverAcademy { return { rank: "Rookie", nextRank: "Dev
   curriculumLevel: 0, phase: "Phase 1 — Fundamentals", phaseGoal: "Machine consistency, track memory, boundaries, and safe inputs.", telemetryFocus: ["racing line", "steering smoothness", "brake markers", "track boundaries"] }; }
 
 function scoreSession(session: SessionSummary, personalBest: number | null, calibration: ScoreCalibration | null) {
-  const laps = session.laps.filter(lap => lap.complete);
+  const laps = session.laps.filter(lap => lap.complete && (!lap.quality || lap.quality.status === "trusted"));
   const braking = average(laps.map(lap => lap.brakingSmoothness));
   const throttle = average(laps.map(lap => lap.throttleSmoothness));
   const consistency = clamp(100 - (session.consistencySeconds ?? 5) * 8);
   const pace = session.fastestLapSeconds && personalBest ? clamp(100 - ((session.fastestLapSeconds - personalBest) / personalBest) * 500) : 60;
   const components = applyScoreCalibration({ braking: round(braking), throttle: round(throttle), consistency: round(consistency), pace: round(pace) }, calibration);
-  return { session, components, score: round(braking * .3 + throttle * .3 + consistency * .2 + pace * .2) };
+  return { session, components, score: round(components.braking * .3 + components.throttle * .3 + components.consistency * .2 + components.pace * .2) };
+}
+function qualitySummary(all: SessionSummary[], trustedCount: number, calibration: ScoreCalibration | null): DriverProfile["dataQuality"] {
+  const limitedSessions = all.filter(session => session.quality?.status === "limited").length;
+  const quarantinedSessions = all.filter(session => session.quality?.status === "quarantined").length;
+  const calibrationStatus = calibration?.status ?? "uncalibrated";
+  const scoreConfidence: DriverProfile["dataQuality"]["scoreConfidence"] = calibrationStatus === "validated" && trustedCount >= 5 ? "high"
+    : trustedCount >= 3 && calibrationStatus !== "uncalibrated" ? "moderate" : "low";
+  return { totalSessions: all.length, trustedSessions: trustedCount, limitedSessions, quarantinedSessions, scoreConfidence, calibrationStatus };
 }
 function average(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 50; }
 function clamp(value: number): number { return Math.max(0, Math.min(100, value)); }

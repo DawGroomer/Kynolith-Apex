@@ -83,6 +83,20 @@ export interface RecordedLap {
   brakingSmoothness: number;
   throttleSmoothness: number;
   complete: boolean;
+  quality?: DataQuality;
+}
+
+export type DataQualityStatus = "trusted" | "limited" | "quarantined";
+export interface DataQuality {
+  version: number;
+  status: DataQualityStatus;
+  score: number;
+  confidence: "low" | "moderate" | "high";
+  reasons: string[];
+  sampleCount: number;
+  activeDrivingPercent?: number;
+  distanceCoveragePercent?: number;
+  discontinuities?: number;
 }
 
 export interface SessionSummary {
@@ -98,6 +112,7 @@ export interface SessionSummary {
   maxSpeedMph: number;
   coachCueCount: number;
   primaryFocus: string;
+  quality?: DataQuality;
 }
 
 export interface RecordedSession {

@@ -1,22 +1,27 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { CoachingCue, RecordedLap, RecordedSession, SessionSummary, TelemetryFrame } from "./types.js";
+import { analyzeLapQuality, applyCorpusQuality, applyCrossSessionBaseline, assessSessionQuality, DATA_QUALITY_VERSION, shouldSplitSession } from "./data-quality.js";
 
 const KPH_TO_MPH = 0.6213711922;
 
 export class SessionRecorder {
   private current: RecordedSession | null = null;
   private lastRecordedAt = 0;
+  private lastObserved: TelemetryFrame | null = null;
 
   constructor(private readonly directory: string) {}
 
-  async initialize(): Promise<void> { await mkdir(this.directory, { recursive: true }); }
+  async initialize(): Promise<void> { await mkdir(this.directory, { recursive: true }); await this.migrateQuality(); }
 
   async recordFrame(frame: TelemetryFrame): Promise<void> {
     if (!this.current) this.current = createSession(frame);
     else if (this.current.summary.track !== frame.track || this.current.summary.session !== frame.session) {
       await this.finish(); this.current = createSession(frame);
+    } else if (this.lastObserved && shouldSplitSession(this.lastObserved, frame)) {
+      await this.finish(); this.current = createSession(frame);
     }
+    this.lastObserved = frame;
     if (frame.timestamp - this.lastRecordedAt < 100) return;
     this.lastRecordedAt = frame.timestamp;
     this.current.frames.push(frame);
@@ -31,8 +36,9 @@ export class SessionRecorder {
     const session = this.current;
     this.current = null;
     this.lastRecordedAt = 0;
+    this.lastObserved = null;
     if (!session || session.frames.length < 20) return null;
-    session.summary = summarize(session);
+    session.summary = applyCrossSessionBaseline(summarize(session), await this.trackVehicleBaseline(session.summary.track, session.summary.vehicle));
     await writeFile(path.join(this.directory, `${session.summary.id}.json`), JSON.stringify(session), "utf8");
     return session.summary;
   }
@@ -53,6 +59,36 @@ export class SessionRecorder {
     catch { return null; }
   }
 
+  private async migrateQuality(): Promise<void> {
+    const files = (await readdir(this.directory)).filter(file => /^session-\d+\.json$/.test(file));
+    const loaded: Array<{ file: string; session: RecordedSession }> = [];
+    for (const file of files) {
+      const location = path.join(this.directory, file);
+      try {
+        const session = JSON.parse(await readFile(location, "utf8")) as RecordedSession;
+        loaded.push({ file, session });
+      } catch { /* Preserve unreadable source files for manual recovery. */ }
+    }
+    if (!loaded.some(({ session }) => session.summary.quality?.version !== DATA_QUALITY_VERSION || session.summary.laps.some(lap => lap.quality?.version !== DATA_QUALITY_VERSION))) return;
+    const summaries = applyCorpusQuality(loaded.map(({ session }) => summarize(session)));
+    for (let index = 0; index < loaded.length; index++) {
+      const entry = loaded[index]!;
+      entry.session.summary = summaries[index]!;
+      await writeFile(path.join(this.directory, entry.file), JSON.stringify(entry.session), "utf8");
+    }
+  }
+
+  private async trackVehicleBaseline(track: string, vehicle: string): Promise<number | null> {
+    const files = (await readdir(this.directory)).filter(file => /^session-\d+\.json$/.test(file));
+    const times: number[] = [];
+    for (const file of files) try {
+      const session = JSON.parse(await readFile(path.join(this.directory, file), "utf8")) as RecordedSession;
+      if (session.summary.track !== track || session.summary.vehicle !== vehicle) continue;
+      for (const lap of session.summary.laps) if (lap.quality?.status === "trusted" && lap.durationSeconds >= 35) times.push(lap.durationSeconds);
+    } catch { /* Ignore unreadable history without deleting it. */ }
+    return times.length ? Math.min(...times) : null;
+  }
+
   async comparable(track: string, vehicle: string): Promise<RecordedSession[]> {
     const matches = (await this.list()).filter(summary => summary.track === track && summary.vehicle === vehicle);
     const sessions = await Promise.all(matches.map(summary => this.get(summary.id)));
@@ -65,18 +101,19 @@ function createSession(frame: TelemetryFrame): RecordedSession {
   return {
     summary: { id, startedAt: frame.timestamp, endedAt: frame.timestamp, track: frame.track, vehicle: frame.vehicle,
       session: frame.session, laps: [], fastestLapSeconds: null, consistencySeconds: null, maxSpeedMph: 0,
-      coachCueCount: 0, primaryFocus: "Build consistent, clean laps." },
+      coachCueCount: 0, primaryFocus: "Build consistent, clean laps.", quality: { version: DATA_QUALITY_VERSION, status: "limited", score: 0, confidence: "low", reasons: ["Session is still recording"], sampleCount: 0 } },
     frames: [], cues: []
   };
 }
 
-function summarize(session: RecordedSession): SessionSummary {
+export function summarize(session: RecordedSession): SessionSummary {
   const grouped = new Map<number, TelemetryFrame[]>();
   for (const frame of session.frames) {
     const frames = grouped.get(frame.lap) ?? []; frames.push(frame); grouped.set(frame.lap, frames);
   }
-  const laps: RecordedLap[] = [...grouped.entries()].sort(([a], [b]) => a - b).map(([lap, frames]) => analyzeLap(lap, frames));
-  if (laps.length > 1) { laps[0]!.complete = false; laps.at(-1)!.complete = false; }
+  const laps: RecordedLap[] = [...grouped.entries()].sort(([a], [b]) => a - b).map(([lap, frames]) => {
+    const { frames: _frames, ...analysis } = analyzeLapQuality(lap, frames); return analysis;
+  });
   const completeTimes = laps.filter(lap => lap.complete && lap.durationSeconds > 20).map(lap => lap.durationSeconds);
   const categories = new Map<string, number>();
   for (const entry of session.cues) categories.set(entry.cue.category, (categories.get(entry.cue.category) ?? 0) + 1);
@@ -88,25 +125,9 @@ function summarize(session: RecordedSession): SessionSummary {
     consistencySeconds: completeTimes.length > 1 ? standardDeviation(completeTimes) : null,
     maxSpeedMph: Math.max(0, ...session.frames.map(frame => frame.speedKph * KPH_TO_MPH)),
     coachCueCount: session.cues.length,
-    primaryFocus: focusText(primary)
+    primaryFocus: focusText(primary),
+    quality: assessSessionQuality(laps, session.frames)
   };
-}
-
-function analyzeLap(lap: number, frames: TelemetryFrame[]): RecordedLap {
-  const durationSeconds = Math.max(0, (frames.at(-1)!.timestamp - frames[0]!.timestamp) / 1000);
-  const speeds = frames.map(frame => frame.speedKph * KPH_TO_MPH);
-  return {
-    lap, durationSeconds, maxSpeedMph: Math.max(0, ...speeds), averageSpeedMph: average(speeds),
-    brakingSmoothness: smoothness(frames.map(frame => frame.brake)),
-    throttleSmoothness: smoothness(frames.map(frame => frame.throttle)),
-    complete: frames[0]!.lapDistance < 0.08 && frames.at(-1)!.lapDistance > 0.9
-  };
-}
-
-function smoothness(values: number[]): number {
-  if (values.length < 2) return 100;
-  const variation = values.slice(1).reduce((sum, value, i) => sum + Math.abs(value - values[i]!), 0) / (values.length - 1);
-  return Math.round(Math.max(0, Math.min(100, 100 - variation * 350)));
 }
 
 function focusText(category?: string): string {

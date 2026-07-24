@@ -28,3 +28,17 @@ test("academy promotion requires volume and balanced mastery", () => {
   assert.equal(profile.academy.rank, "Prodigy");
   assert.equal(profile.academy.promotionProgress, 100);
 });
+
+test("quarantined history cannot depress progression or inflate completed laps", () => {
+  const trusted = session("trusted", 100, 100, 85);
+  trusted.quality = { version: 3, status: "trusted", score: 95, confidence: "high", reasons: [], sampleCount: 1_000 };
+  trusted.laps[0]!.quality = { version: 3, status: "trusted", score: 95, confidence: "high", reasons: [], sampleCount: 1_000 };
+  const corrupt = session("corrupt", 200, 700, 100);
+  corrupt.quality = { version: 3, status: "quarantined", score: 0, confidence: "low", reasons: ["Implausible duration"], sampleCount: 1_000 };
+  corrupt.laps[0] = { ...corrupt.laps[0]!, complete: false, quality: { version: 3, status: "quarantined", score: 0, confidence: "low", reasons: ["Implausible duration"], sampleCount: 1_000 } };
+  const profile = buildDriverProfile("Will", [corrupt, trusted]);
+  assert.equal(profile.completedLaps, 1);
+  assert.equal(profile.dataQuality.trustedSessions, 1);
+  assert.equal(profile.dataQuality.quarantinedSessions, 1);
+  assert.notEqual(profile.trend, "declined");
+});
