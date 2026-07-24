@@ -1,5 +1,6 @@
 import type { CoachingCue, TelemetryFrame } from "./types.js";
 import { CornerCoach } from "./corner-coach.js";
+import { RacecraftPredictor } from "./racecraft-predictor.js";
 
 interface Sample { frame: TelemetryFrame; }
 
@@ -14,6 +15,7 @@ export class CoachingEngine {
   private instructionIntervalMs = 20_000;
   private instructionMode: "quiet" | "balanced" | "active" = "balanced";
   private cornerCoach = new CornerCoach();
+  private racecraftPredictor = new RacecraftPredictor();
   private leftSeen = 0; private rightSeen = 0; private leftClear = 0; private rightClear = 0;
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
 
@@ -67,6 +69,7 @@ export class CoachingEngine {
       }
     }
     cues.push(...this.cornerCoach.ingest(frame, this.instructionMode === "active"));
+    cues.push(...this.racecraftPredictor.ingest(frame));
 
     const hottest = Math.max(...frame.tireTempC);
     const spread = hottest - Math.min(...frame.tireTempC);

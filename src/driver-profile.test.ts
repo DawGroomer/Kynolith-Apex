@@ -15,4 +15,16 @@ test("driver profile reports improvement against a comparable previous session",
   assert.equal(profile.trend, "improved");
   assert.ok((profile.change ?? 0) > 0);
   assert.equal(profile.completedLaps, 2);
+  assert.equal(profile.academy.rank, "Rookie");
+  assert.ok(profile.academy.requirements.length > 0);
+  assert.ok(profile.academy.drill.instructions.length > 20);
+});
+
+test("academy promotion requires volume and balanced mastery", () => {
+  const sessions = Array.from({ length: 16 }, (_, index) => ({ ...session(`s${index}`, 10_000 - index, 100, 96), track: `Track ${index % 3}`, vehicle: `Car ${index % 3}`,
+    consistencySeconds: .2, laps: Array.from({ length: 4 }, (_, lap) => ({ lap: lap + 1, durationSeconds: 100 + lap * .1, maxSpeedMph: 170,
+      averageSpeedMph: 105, brakingSmoothness: 96, throttleSmoothness: 96, complete: true })) }));
+  const profile = buildDriverProfile("Will", sessions);
+  assert.equal(profile.academy.rank, "Prodigy");
+  assert.equal(profile.academy.promotionProgress, 100);
 });

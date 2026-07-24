@@ -1,4 +1,5 @@
 import type { CornerPerformance, DrivingReference, RecordedSession, SessionIntelligence, TelemetryFrame, TrackCorner } from "./types.js";
+import { buildSetupReport } from "./setup-advisor.js";
 
 const MPH = .6213711922;
 
@@ -57,11 +58,14 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
   const trackDiscipline = clamp(100 - relevantFrames.filter(frame => frame.offTrackWheels >= 2).length / Math.max(1, relevantFrames.length) * 1000);
   const skills = { braking, throttle, consistency, trackDiscipline };
   const lowest = Object.entries(skills).sort((a, b) => a[1] - b[1])[0]?.[0] ?? "consistency";
+  const racecraft = { multiclassEncounters: countMulticlassEncounters(relevantFrames),
+    predictiveWarnings: session.cues.filter(entry => entry.cue.id.startsWith("multiclass-")).length };
   return { model, referenceLap,
     reference: activeReference ? { source: activeReference.source, label: activeReference.label, lapTimeSeconds: activeReference.lapTimeSeconds } : null,
     personalBestSeconds: personalBest?.lapTimeSeconds ?? completeLaps[0]?.durationSeconds ?? null,
     theoreticalBestSeconds: theoreticalBest(completeLaps.map(lap => perLap.get(lap.lap) ?? [])),
-    sessionObjective: objective(lowest), skills, corners };
+    sessionObjective: objective(lowest), skills, corners, racecraft, setupFindings: setupFindings(relevantFrames, completeLaps.length, session.summary.consistencySeconds),
+    setupReport: buildSetupReport(session) };
 }
 
 function within(frames: TelemetryFrame[], corner: TrackCorner): TelemetryFrame[] { return frames.filter(frame => frame.lapDistance >= corner.entry && frame.lapDistance <= corner.exit); }
@@ -82,4 +86,39 @@ function theoreticalBest(laps: TelemetryFrame[][]): number | null {
 function objective(skill: string): string {
   return ({ braking: "Brake-release consistency: make pressure reduction smooth and repeatable.", throttle: "Exit discipline: use one progressive throttle application.",
     consistency: "Repeatability: hold the same references for three clean laps.", trackDiscipline: "Track discipline: finish three valid laps without a limits warning." } as Record<string, string>)[skill] ?? "Build three clean, repeatable laps.";
+}
+
+function countMulticlassEncounters(frames: TelemetryFrame[]): number {
+  let encounters = 0; let active = false;
+  for (const frame of frames) {
+    const nearDifferentClass = [
+      [frame.opponentAheadClass, frame.opponentAheadDistanceMeters],
+      [frame.opponentBehindClass, frame.opponentBehindDistanceMeters]
+    ].some(([opponent, distance]) => typeof opponent === "string" && opponent !== frame.vehicleClass && Number(distance) < 150);
+    if (nearDifferentClass && !active) encounters++;
+    active = nearDifferentClass;
+  }
+  return encounters;
+}
+
+function setupFindings(frames: TelemetryFrame[], completedLaps: number, consistency: number | null): SessionIntelligence["setupFindings"] {
+  if (completedLaps < 2 || consistency == null || consistency > 1.5 || frames.length < 100) return [];
+  const findings: SessionIntelligence["setupFindings"] = [];
+  const hotFrames = frames.filter(frame => frame.speedKph > 80 && Math.max(...frame.tireTempC) > 40);
+  if (!hotFrames.length) return findings;
+  const frontTemp = average(hotFrames.flatMap(frame => frame.tireTempC.slice(0, 2)));
+  const rearTemp = average(hotFrames.flatMap(frame => frame.tireTempC.slice(2, 4)));
+  if (frontTemp - rearTemp > 8) findings.push({ area: "Axle temperature balance", confidence: "moderate",
+    evidence: `Front tires averaged ${(frontTemp - rearTemp).toFixed(1)} °C hotter than the rear during representative running.`,
+    recommendation: "Confirm the pattern over another clean stint; then review front pressure, roll balance, and entry technique before changing aero." });
+  else if (rearTemp - frontTemp > 8) findings.push({ area: "Rear tire loading", confidence: "moderate",
+    evidence: `Rear tires averaged ${(rearTemp - frontTemp).toFixed(1)} °C hotter than the front during representative running.`,
+    recommendation: "Confirm wheelspin and slip first; then review rear pressure, differential behavior, and traction settings." });
+  const pressureSpread = average(hotFrames.map(frame => Math.max(...frame.tirePressurePsi) - Math.min(...frame.tirePressurePsi)));
+  if (pressureSpread > 1.5) findings.push({ area: "Hot pressure spread", confidence: "moderate", evidence: `Average cross-car hot-pressure spread was ${pressureSpread.toFixed(1)} PSI.`,
+    recommendation: "Adjust cold pressures in small steps to converge hot pressures after equal tire preparation." });
+  const brakeImbalance = average(hotFrames.map(frame => Math.abs(average(frame.brakeTempF.slice(0, 2)) - average(frame.brakeTempF.slice(2, 4)))));
+  if (brakeImbalance > 180) findings.push({ area: "Brake temperature balance", confidence: "low", evidence: `Front-to-rear brake temperature separation averaged ${brakeImbalance.toFixed(0)} °F.`,
+    recommendation: "Correlate with lockups and stopping stability before changing brake bias or ducting." });
+  return findings;
 }

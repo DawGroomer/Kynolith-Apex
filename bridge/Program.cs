@@ -106,6 +106,7 @@ internal static class Program
         var lapDistance = trackLength > 1 ? Math.Clamp(playerScore.mLapDist / trackLength, 0, 1) : 0;
         var session = scoring.mScoringInfo.mSession switch { >= 1 and <= 4 => "practice", >= 5 and <= 8 => "qualifying", >= 10 and <= 13 => "race", _ => "unknown" };
         var (carLeft, carRight) = CarsAlongside(playerScore, scoringVehicles, scoringCount);
+        var traffic = NearestTraffic(playerScore, scoringVehicles, scoringCount, trackLength);
         var offTrackWheels = tires.Count(wheel => wheel.mSurfaceType is >= 2 and <= 4);
 
         return new
@@ -117,14 +118,40 @@ internal static class Program
             brake = Clamp01(car.mUnfilteredBrake), steering = Math.Clamp(car.mUnfilteredSteering, -1, 1),
             lateralG = car.mLocalAccel.x / Gravity, longitudinalG = -car.mLocalAccel.z / Gravity,
             fuelLiters = Math.Max(0, car.mFuel), tireTempC = tireTemps, tireWear, tirePressurePsi, brakeTempF,
-            position = Math.Max(1, (int)playerScore.mPlace), classPosition,
+            position = Math.Max(1, (int)playerScore.mPlace), classPosition, vehicleClass,
             gapAheadSeconds = ValidGap(car.mTimeGapCarAhead), gapBehindSeconds = ValidGap(car.mTimeGapCarBehind),
+            opponentAheadClass = traffic.AheadClass, opponentBehindClass = traffic.BehindClass,
+            opponentAheadDistanceMeters = traffic.AheadDistance, opponentBehindDistanceMeters = traffic.BehindDistance,
+            opponentAheadSpeedKph = traffic.AheadSpeed, opponentBehindSpeedKph = traffic.BehindSpeed,
             // LMU's yellow-state and sector arrays can retain transitional/stale
             // values. Game phase 6 is the authoritative active FCY/safety-car state.
             inPits = playerScore.mInPits != 0, yellowFlag = scoring.mScoringInfo.mGamePhase == 6, carLeft, carRight,
             offTrackWheels, trackLimitsSteps = (int)car.mTrackLimitsSteps, lapInvalidated = car.mLapInvalidated != 0
         };
     }
+
+    private static (string? AheadClass, string? BehindClass, double? AheadDistance, double? BehindDistance, double? AheadSpeed, double? BehindSpeed) NearestTraffic(rF2VehicleScoring player, rF2VehicleScoring[] vehicles, int count, double trackLength)
+    {
+        if (trackLength <= 1) return (null, null, null, null, null, null);
+        var playerProgress = player.mTotalLaps * trackLength + player.mLapDist;
+        rF2VehicleScoring? ahead = null; rF2VehicleScoring? behind = null;
+        var aheadDistance = double.MaxValue; var behindDistance = double.MaxValue;
+        for (var i = 0; i < count; i++)
+        {
+            var other = vehicles[i];
+            if (other.mID == player.mID || other.mInPits != 0 || other.mControl < 0) continue;
+            var delta = other.mTotalLaps * trackLength + other.mLapDist - playerProgress;
+            if (delta > trackLength / 2) delta -= trackLength;
+            if (delta < -trackLength / 2) delta += trackLength;
+            if (delta > 0 && delta < aheadDistance) { aheadDistance = delta; ahead = other; }
+            else if (delta < 0 && -delta < behindDistance) { behindDistance = -delta; behind = other; }
+        }
+        return (ahead is null ? null : Decode(ahead.Value.mVehicleClass), behind is null ? null : Decode(behind.Value.mVehicleClass),
+            ahead is null ? null : aheadDistance, behind is null ? null : behindDistance,
+            ahead is null ? null : ScoringSpeed(ahead.Value), behind is null ? null : ScoringSpeed(behind.Value));
+    }
+
+    private static double ScoringSpeed(rF2VehicleScoring vehicle) => Math.Sqrt(Square(vehicle.mLocalVel.x) + Square(vehicle.mLocalVel.y) + Square(vehicle.mLocalVel.z)) * 3.6;
 
     private static (bool Left, bool Right) CarsAlongside(rF2VehicleScoring player, rF2VehicleScoring[] vehicles, int count)
     {

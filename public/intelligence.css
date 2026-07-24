@@ -16,3 +16,19 @@
 .reference-file { color:var(--muted); font-size:11px; letter-spacing:.12em; }
 .reference-file input { display:block; margin-top:8px; max-width:260px; }
 @media(max-width:950px) { .reference-import { grid-template-columns:1fr; } }
+.milestone-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+.evidence-list { display:grid; gap:10px; }
+.evidence-item { display:grid; grid-template-columns:1fr auto; gap:4px 12px; border-left:3px solid var(--cyan); background:#091317; padding:12px; }
+.evidence-item b { color:var(--cyan); }
+.evidence-item p { grid-column:1/-1; color:var(--muted); margin:0; }
+@media(max-width:950px) { .milestone-grid { grid-template-columns:1fr; } }
+.setup-readiness { display:grid; grid-template-columns:1fr 2fr; gap:14px; }
+.diagnosis-list { display:grid; gap:14px; margin-top:14px; }
+.diagnosis-card { min-height:0; border-left:4px solid var(--amber); }
+.diagnosis-card.setup-candidate { border-left-color:var(--cyan); }
+.diagnosis-head { display:flex; justify-content:space-between; gap:20px; }
+.diagnosis-head h3 { margin:0; font-size:24px; }
+.diagnosis-head > strong { color:var(--cyan); font-size:32px; }
+.diagnosis-card h4 { color:var(--cyan); letter-spacing:.14em; margin-bottom:5px; }
+.diagnosis-card li,.diagnosis-card p { color:#b6cbd1; }
+@media(max-width:950px) { .setup-readiness { grid-template-columns:1fr; } }

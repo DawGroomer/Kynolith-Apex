@@ -137,9 +137,10 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   if (state.source === "lmu" && sessionKey !== welcomedSessionKey) {
     welcomedSessionKey = sessionKey;
     const name = settings.get().driverName;
+    const academy = buildDriverProfile(name, await recorder.list()).academy;
     scheduler.enqueue([{
       id: `welcome-${frame.timestamp}`, at: frame.timestamp, priority: "info", category: "lap",
-      message: name ? `All right, ${name}, I'm with you. Let's build into this session and find the pace together.` : "All right, I'm with you. Let's build into this session and find the pace together.",
+      message: name ? `${name}, today's drill: ${academy.drill.name}. Build into it.` : `Today's drill: ${academy.drill.name}. Build into it.`,
       speak: true, expiresAt: frame.timestamp + 15_000, delayInHardPart: true
     }]);
   }

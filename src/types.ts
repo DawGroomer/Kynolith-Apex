@@ -24,8 +24,15 @@ export interface TelemetryFrame {
   brakeTempF: [number, number, number, number];
   position: number;
   classPosition: number;
+  vehicleClass?: string;
   gapAheadSeconds: number | null;
   gapBehindSeconds: number | null;
+  opponentAheadClass?: string | null;
+  opponentBehindClass?: string | null;
+  opponentAheadDistanceMeters?: number | null;
+  opponentBehindDistanceMeters?: number | null;
+  opponentAheadSpeedKph?: number | null;
+  opponentBehindSpeedKph?: number | null;
   inPits: boolean;
   yellowFlag: boolean;
   carLeft: boolean;
@@ -98,6 +105,28 @@ export interface SessionIntelligence {
   sessionObjective: string;
   skills: { braking: number; throttle: number; consistency: number; trackDiscipline: number };
   corners: CornerPerformance[];
+  racecraft: { multiclassEncounters: number; predictiveWarnings: number };
+  setupFindings: Array<{ area: string; evidence: string; recommendation: string; confidence: "low" | "moderate" }>;
+  setupReport: SetupReport;
+}
+
+export interface SetupDiagnosis {
+  id: string;
+  area: string;
+  classification: "driver-first" | "setup-candidate";
+  confidence: "low" | "moderate" | "high";
+  priority: number;
+  symptom: string;
+  evidence: string[];
+  recommendation: string;
+  validation: string;
+}
+
+export interface SetupReport {
+  status: "not-ready" | "driver-first" | "setup-ready";
+  readinessScore: number;
+  blockers: string[];
+  diagnoses: SetupDiagnosis[];
 }
 
 export interface DrivingReference {
