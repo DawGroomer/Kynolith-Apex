@@ -16,6 +16,7 @@ import { TrackModelStore } from "./track-model-store.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
 import { ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
+import { convertReferenceFile } from "./reference-converter.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 
 export interface CoachServerOptions {
@@ -120,6 +121,14 @@ app.get("/api/references", async (_req, res) => res.json(await references.list()
 app.post("/api/references/import", async (req, res) => {
   try { res.status(201).json(await references.import(req.body)); }
   catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid reference" }); }
+});
+app.post("/api/references/import-file", express.raw({ type: "application/octet-stream", limit: "256mb" }), async (req, res) => {
+  try {
+    const filename = decodeURIComponent(String(req.header("x-apex-filename") ?? "reference")).slice(0, 180);
+    const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!buffer.length) return res.status(400).json({ error: "Reference file is empty" });
+    res.status(201).json(await references.import(await convertReferenceFile(filename, buffer)));
+  } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Reference conversion failed" }); }
 });
 app.post("/api/local/transcribe", express.raw({ type: "application/octet-stream", limit: "8mb" }), async (req, res) => {
   try {

@@ -34,7 +34,8 @@ export class ReferenceStore {
     const lapFrames = requestedLap == null ? frames : frames.filter(frame => frame.lap === requestedLap);
     const lapTimeSeconds = lapFrames.length > 1 ? (lapFrames.at(-1)!.timestamp - lapFrames[0]!.timestamp) / 1000 : null;
     const importedAt = Date.now(), id = `reference-${importedAt.toString(36)}`;
-    const reference: DrivingReference = { id, name: String(source.name ?? `Expert ${track}`).trim().slice(0, 80), track, vehicle, importedAt, lapTimeSeconds, frames: lapFrames };
+    const provenance = source.provenance && typeof source.provenance === "object" ? source.provenance : undefined;
+    const reference: DrivingReference = { id, name: String(source.name ?? `Expert ${track}`).trim().slice(0, 80), track, vehicle, importedAt, lapTimeSeconds, frames: lapFrames, ...(provenance ? { provenance } : {}) };
     await this.initialize();
     await writeFile(path.join(this.directory, `${id}.json`), JSON.stringify(reference), "utf8");
     const { frames: _frames, ...summary } = reference;

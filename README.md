@@ -50,6 +50,16 @@ The **Settings** tab persists the selected American Windows voice, volume, rate,
 - Expert-labelled score sets can be imported through `/api/calibration/import`; calibration error is retained for every skill model.
 - Tagged GitHub releases are Authenticode signed when the Kynolith certificate and password secrets are configured.
 
+## Community reference import
+
+The Expert Reference Library accepts official LMU `.duckdb` telemetry recordings, MoTeC i2 CSV exports, generic CSV telemetry, and Apex JSON sessions. Apex detects the format, maps channel names and units, preserves provenance, and selects the fastest complete lap. The minimum useful CSV channels are time, speed, and lap distance; throttle and brake are strongly recommended for coaching comparisons. Raw MoTeC `.ld` files must first be exported from MoTeC i2 as CSV because the binary format is proprietary and varies by logger.
+
+To convert a file outside the desktop UI, run:
+
+```powershell
+pnpm reference:convert -- "input.duckdb" "reference.json"
+```
+
 ## Desktop build
 
 Run `pnpm dist:win`. This publishes the self-contained x64 .NET telemetry bridge, verifies its LMU 3.8 structure sizes, compiles the TypeScript server, and packages both into a portable Electron executable under `release/`.

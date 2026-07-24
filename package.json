@@ -15,6 +15,7 @@
     "test:soak:accelerated": "tsx scripts/soak-telemetry.ts --minutes=60 --accelerated",
     "test:local-ai": "tsx scripts/test-local-ai.ts",
     "test:local-voice": "tsx scripts/test-local-voice.ts",
+    "reference:convert": "tsx scripts/convert-reference.ts",
     "models:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stage-offline-models.ps1",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
@@ -24,6 +25,7 @@
     "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
   },
   "dependencies": {
+    "@duckdb/node-api": "1.5.5-r.1",
     "@huggingface/transformers": "^3.8.1",
     "express": "^5.1.0",
     "kokoro-js": "1.2.1",

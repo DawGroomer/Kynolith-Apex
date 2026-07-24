@@ -187,6 +187,13 @@ export interface DrivingReference {
   vehicle: string;
   importedAt: number;
   lapTimeSeconds: number | null;
+  provenance?: {
+    format: "apex-json" | "lmu-duckdb" | "csv" | "motec-csv";
+    sourceFile: string;
+    driver?: string;
+    channels: string[];
+    warnings: string[];
+  };
   frames: TelemetryFrame[];
 }
 
