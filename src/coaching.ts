@@ -15,6 +15,7 @@ export class CoachingEngine {
   private lastLap = 0;
   private instructionIntervalMs = 20_000;
   private instructionMode: "quiet" | "balanced" | "active" = "balanced";
+  private curriculumLevel: 0 | 1 | 2 | 3 = 0;
   private cornerCoach = new CornerCoach();
   private racecraftPredictor = new RacecraftPredictor();
   private strategyCoach = new StrategyCoach();
@@ -26,6 +27,8 @@ export class CoachingEngine {
     this.instructionMode = mode;
     this.instructionIntervalMs = { quiet: 35_000, balanced: 20_000, active: 12_000 }[mode];
   }
+
+  setCurriculumLevel(level: 0 | 1 | 2 | 3): void { this.curriculumLevel = level; }
 
   ingest(frame: TelemetryFrame): CoachingCue[] {
     this.history.push({ frame });
@@ -89,18 +92,22 @@ export class CoachingEngine {
       }
     }
     cues.push(...this.cornerCoach.ingest(frame, this.instructionMode === "active"));
-    cues.push(...this.racecraftPredictor.ingest(frame));
-    cues.push(...this.strategyCoach.ingest(frame));
+    if (this.curriculumLevel >= 2) cues.push(...this.racecraftPredictor.ingest(frame));
+    if (this.curriculumLevel >= 3) cues.push(...this.strategyCoach.ingest(frame));
 
     const hottest = Math.max(...frame.tireTempC);
     const spread = hottest - Math.min(...frame.tireTempC);
     if (hottest > 115) this.emit(cues, frame, "hot-tire", 25_000, "race", "tires", "Tire temperature is critical. Back off the sliding and open the corner exits for half a lap.");
     else if (spread > 22) this.emit(cues, frame, "tire-spread", 30_000, "info", "tires", "Large tire temperature split. Build load progressively and avoid scrubbing the cold end.");
     if (this.instructionMode !== "active" && !frame.inPits && frame.speedKph > 45 && frame.timestamp - this.lastGuidanceAt >= this.instructionIntervalMs) {
-      const guidance = frame.brake > .18 ? "Stay smooth as you release the brake. Let the front tires carry you toward the apex."
-        : Math.abs(frame.steering) > .3 ? "Eyes through the corner now. Be patient, then open your hands for the exit."
-        : frame.throttle > .75 ? "Good. Keep looking ahead and make the next input deliberate."
-        : "Settle into the rhythm. One clean reference point and one clean input at a time.";
+      const guidance = this.curriculumLevel === 0
+        ? (frame.brake > .18 ? "Smooth off the brake. Look through the exit." : Math.abs(frame.steering) > .3 ? "Eyes through the corner. One smooth steering input." : "Use the same marker. Smooth on, smooth off.")
+        : this.curriculumLevel === 1
+          ? (frame.brake > .18 ? "Release the brake progressively and keep the front loaded." : Math.abs(frame.steering) > .3 ? "Balance steering against throttle. Unwind before adding power." : "Protect minimum speed with one clean release.")
+          : frame.brake > .18 ? "Match the reference release and protect apex speed."
+            : Math.abs(frame.steering) > .3 ? "Hold the reference arc. Minimize scrub."
+            : frame.throttle > .75 ? "Good. Compare that exit against the reference."
+            : "Stay on the session target. Change one reference at a time.";
       this.emit(cues, frame, "coach-checkin", 18_000, "technique", "lap", guidance);
       this.lastGuidanceAt = frame.timestamp;
     }

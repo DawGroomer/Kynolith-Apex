@@ -113,6 +113,7 @@ export interface SessionIntelligence {
   setupFindings: Array<{ area: string; evidence: string; recommendation: string; confidence: "low" | "moderate" }>;
   setupReport: SetupReport;
   strategy: StrategyReport;
+  curriculum: import("./curriculum.js").CurriculumAssessment;
 }
 
 export interface StrategyReport {

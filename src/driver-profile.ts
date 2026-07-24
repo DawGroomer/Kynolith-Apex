@@ -1,4 +1,5 @@
 import type { SessionSummary } from "./types.js";
+import { curriculumForRank, type CurriculumLevel } from "./curriculum.js";
 
 export interface DriverProfile {
   driverName: string; score: number | null; change: number | null; trend: "improved" | "declined" | "steady" | "new";
@@ -16,6 +17,10 @@ export interface DriverAcademy {
   objective: string;
   drill: { name: string; instructions: string; success: string };
   mastery: Array<{ skill: string; score: number; state: "learning" | "capable" | "mastered" }>;
+  curriculumLevel: CurriculumLevel;
+  phase: string;
+  phaseGoal: string;
+  telemetryFocus: string[];
 }
 
 export function buildDriverProfile(driverName: string, all: SessionSummary[]): DriverProfile {
@@ -65,9 +70,11 @@ function buildAcademy(components: NonNullable<DriverProfile["components"]>, scor
   const promotionProgress = isProdigy ? 100 : Math.round(average(requirements.map(item => Math.min(1, Number(item.current) / Number(item.target)))) * 100);
   const weakest = Object.entries(components).sort((a, b) => a[1] - b[1])[0]?.[0] ?? "consistency";
   const drill = drillFor(weakest);
+  const curriculum = curriculumForRank(rank);
   return { rank, nextRank: isProdigy ? null : next.rank, promotionProgress, requirements,
     objective: isProdigy ? "Sustain expert pace across changing conditions, traffic, and stint phases." : `${next.rank} promotion: raise ${weakest} while preserving clean, repeatable laps.`,
-    drill, mastery: Object.entries(components).map(([skill, value]) => ({ skill, score: value, state: value >= 90 ? "mastered" : value >= 75 ? "capable" : "learning" })) };
+    drill, mastery: Object.entries(components).map(([skill, value]) => ({ skill, score: value, state: value >= 90 ? "mastered" : value >= 75 ? "capable" : "learning" })),
+    curriculumLevel: curriculum.level, phase: curriculum.phase, phaseGoal: curriculum.goal, telemetryFocus: [...curriculum.telemetryFocus] };
 }
 
 function drillFor(skill: string): DriverAcademy["drill"] {
@@ -80,7 +87,8 @@ function drillFor(skill: string): DriverAcademy["drill"] {
 
 function emptyAcademy(): DriverAcademy { return { rank: "Rookie", nextRank: "Developing", promotionProgress: 0,
   requirements: [{ label: "Valid laps", current: "0", target: "5", met: false }], objective: "Establish a clean telemetry baseline.",
-  drill: { name: "Clean Baseline", instructions: "Complete three clean representative laps.", success: "Three valid laps within one second." }, mastery: [] }; }
+  drill: { name: "Clean Baseline", instructions: "Complete three clean representative laps.", success: "Three valid laps within one second." }, mastery: [],
+  curriculumLevel: 0, phase: "Phase 1 — Fundamentals", phaseGoal: "Machine consistency, track memory, boundaries, and safe inputs.", telemetryFocus: ["racing line", "steering smoothness", "brake markers", "track boundaries"] }; }
 
 function scoreSession(session: SessionSummary, personalBest: number | null) {
   const laps = session.laps.filter(lap => lap.complete);

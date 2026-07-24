@@ -96,7 +96,8 @@ app.get("/api/sessions/:id", async (req, res) => {
   const personal = selectPersonalBest(await recorder.comparable(session.summary.track, session.summary.vehicle));
   const expert = await references.matching(session.summary.track, session.summary.vehicle);
   const model = await trackModels.resolve(session);
-  res.json({ ...session, intelligence: analyzeSessionIntelligence(session, personal, expert, model) });
+  const profile = buildDriverProfile(settings.get().driverName, await recorder.list());
+  res.json({ ...session, intelligence: analyzeSessionIntelligence(session, personal, expert, model, profile.academy.rank) });
 });
 app.get("/api/references", async (_req, res) => res.json(await references.list()));
 app.post("/api/references/import", async (req, res) => {
@@ -116,7 +117,8 @@ app.post("/api/local/ask", async (req, res) => {
     const question = String(req.body?.question ?? "").trim().slice(0, 500);
     if (!question) return res.status(400).json({ error: "Question is required" });
     const latest = (await recorder.list())[0] ?? null;
-    const answer = await localAi.answer(question, state, latest);
+    const sessionAnswer = latest ? await answerSessionQuestion(question, latest.id) : null;
+    const answer = sessionAnswer ?? await localAi.answer(question, state, latest);
     const config = settings.get();
     res.json({ answer: personalize(applyTemper(answer, config.swearingLevel, question), config.driverName) });
   } catch (error) { res.status(500).json({ error: error instanceof Error ? error.message : "Local coach failed" }); }
@@ -143,6 +145,7 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
     welcomedSessionKey = sessionKey;
     const name = settings.get().driverName;
     const academy = buildDriverProfile(name, await recorder.list()).academy;
+    engine.setCurriculumLevel(academy.curriculumLevel);
     scheduler.enqueue([{
       id: `welcome-${frame.timestamp}`, at: frame.timestamp, priority: "info", category: "lap",
       message: name ? `${name}, today's drill: ${academy.drill.name}. Build into it.` : `Today's drill: ${academy.drill.name}. Build into it.`,
@@ -184,6 +187,24 @@ function personalize(message: string, driverName: string): string {
 
 function shouldUseName(cueId: string, lap: number): boolean {
   return (cueId.length + lap) % 3 === 0;
+}
+
+async function answerSessionQuestion(question: string, sessionId: string): Promise<string | null> {
+  const q = question.toLowerCase();
+  if (!/where.*(losing|lose).*time|worst corner|technique score|current drill|what.*focus/.test(q)) return null;
+  const session = await recorder.get(sessionId); if (!session) return null;
+  const personal = selectPersonalBest(await recorder.comparable(session.summary.track, session.summary.vehicle));
+  const expert = await references.matching(session.summary.track, session.summary.vehicle);
+  const model = await trackModels.resolve(session);
+  const profile = buildDriverProfile(settings.get().driverName, await recorder.list());
+  const intelligence = analyzeSessionIntelligence(session, personal, expert, model, profile.academy.rank);
+  const drill = intelligence.curriculum.focusedDrill;
+  if (/technique score/.test(q)) {
+    const score = intelligence.curriculum.technique;
+    return `Trail braking ${score.trailBrake}, steering efficiency ${score.steeringEfficiency}, and throttle squeeze ${score.throttleSqueeze} out of 100.`;
+  }
+  if (/current drill|what.*focus/.test(q)) return drill?.instruction ?? profile.academy.drill.instructions;
+  return drill ? `Your largest repeatable loss is ${drill.averageLossSeconds.toFixed(2)} seconds at ${drill.corner}. Focus there and target recovering ${drill.recoveryTargetSeconds.toFixed(2)} seconds.` : "I do not see a repeatable corner loss yet. Build another clean reference lap.";
 }
 
 function selectPersonalBest(sessions: import("./types.js").RecordedSession[]): { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null {

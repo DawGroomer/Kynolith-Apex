@@ -56,7 +56,9 @@ internal static class Program
             }
             var frame = MapFrame(telemetry, scoring);
             if (frame is not null) Console.WriteLine(JsonSerializer.Serialize(frame, JsonOptions));
-            await Task.Delay(50, cancellation);
+            // Approximately 67 Hz gives input-rate analysis enough resolution
+            // without saturating Electron's JSON telemetry channel.
+            await Task.Delay(15, cancellation);
         }
         Console.Error.WriteLine("LMU telemetry disconnected.");
     }
