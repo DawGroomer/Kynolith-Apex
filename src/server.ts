@@ -12,6 +12,7 @@ import { SettingsStore, spacingFor } from "./settings.js";
 import { buildDriverProfile } from "./driver-profile.js";
 import { analyzeSessionIntelligence } from "./track-intelligence.js";
 import { ReferenceStore } from "./reference-store.js";
+import { TrackModelStore } from "./track-model-store.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 
 export interface CoachServerOptions {
@@ -38,6 +39,8 @@ const recorder = new SessionRecorder(path.join(dataDir, "sessions"));
 await recorder.initialize();
 const references = new ReferenceStore(path.join(dataDir, "references"));
 await references.initialize();
+const trackModels = new TrackModelStore(path.join(dataDir, "track-models"));
+await trackModels.initialize();
 const settings = new SettingsStore(path.join(dataDir, "settings.json"));
 await settings.initialize();
 scheduler.setMinimumSpacing(spacingFor(settings.get().speechFrequency));
@@ -91,7 +94,8 @@ app.get("/api/sessions/:id", async (req, res) => {
   if (!session) return res.status(404).json({ error: "Session not found" });
   const personal = selectPersonalBest(await recorder.comparable(session.summary.track, session.summary.vehicle));
   const expert = await references.matching(session.summary.track, session.summary.vehicle);
-  res.json({ ...session, intelligence: analyzeSessionIntelligence(session, personal, expert) });
+  const model = await trackModels.resolve(session);
+  res.json({ ...session, intelligence: analyzeSessionIntelligence(session, personal, expert, model) });
 });
 app.get("/api/references", async (_req, res) => res.json(await references.list()));
 app.post("/api/references/import", async (req, res) => {

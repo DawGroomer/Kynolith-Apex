@@ -80,6 +80,7 @@ export interface TrackCorner {
   apex: number;
   exit: number;
 }
+export interface TrackModel { track: string; version: number; source: "curated" | "learned"; corners: TrackCorner[]; }
 
 export interface CornerPerformance {
   cornerId: string;
@@ -97,7 +98,7 @@ export interface CornerPerformance {
 }
 
 export interface SessionIntelligence {
-  model: { track: string; version: number; corners: TrackCorner[] } | null;
+  model: TrackModel | null;
   referenceLap: number | null;
   reference: { source: "personal-best" | "expert" | "session"; label: string; lapTimeSeconds: number | null } | null;
   personalBestSeconds: number | null;
@@ -108,6 +109,18 @@ export interface SessionIntelligence {
   racecraft: { multiclassEncounters: number; predictiveWarnings: number };
   setupFindings: Array<{ area: string; evidence: string; recommendation: string; confidence: "low" | "moderate" }>;
   setupReport: SetupReport;
+  strategy: StrategyReport;
+}
+
+export interface StrategyReport {
+  status: "insufficient-data" | "stable" | "watch" | "pit-risk";
+  completedLaps: number;
+  fuelPerLapGallons: number | null;
+  estimatedLapsRemaining: number | null;
+  tireWearPerLapPercent: number | null;
+  paceTrendSecondsPerLap: number | null;
+  projectedStintLaps: number | null;
+  recommendation: string;
 }
 
 export interface SetupDiagnosis {

@@ -32,3 +32,8 @@
 .diagnosis-card h4 { color:var(--cyan); letter-spacing:.14em; margin-bottom:5px; }
 .diagnosis-card li,.diagnosis-card p { color:#b6cbd1; }
 @media(max-width:950px) { .setup-readiness { grid-template-columns:1fr; } }
+.strategy-grid { display:grid; grid-template-columns:2fr repeat(5,1fr); gap:14px; margin-bottom:14px; }
+.strategy-grid article { min-height:160px; }
+.corner-chip-list { display:flex; flex-wrap:wrap; gap:8px; }
+.corner-chip-list span { border:1px solid var(--line); color:var(--cyan); background:#091317; padding:8px 11px; }
+@media(max-width:1100px) { .strategy-grid { grid-template-columns:repeat(2,1fr); } }

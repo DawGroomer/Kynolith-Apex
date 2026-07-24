@@ -1,5 +1,6 @@
-import type { CornerPerformance, DrivingReference, RecordedSession, SessionIntelligence, TelemetryFrame, TrackCorner } from "./types.js";
+import type { CornerPerformance, DrivingReference, RecordedSession, SessionIntelligence, TelemetryFrame, TrackCorner, TrackModel } from "./types.js";
 import { buildSetupReport } from "./setup-advisor.js";
+import { analyzeStrategy } from "./strategy-engine.js";
 
 const MPH = .6213711922;
 
@@ -17,15 +18,15 @@ const FUJI_CORNERS: TrackCorner[] = [
 
 export function trackModel(track: string): SessionIntelligence["model"] {
   if (!/fuji/i.test(track)) return null;
-  return { track: "Fuji Speedway", version: 1, corners: FUJI_CORNERS };
+  return { track: "Fuji Speedway", version: 1, source: "curated", corners: FUJI_CORNERS };
 }
 
 export function identifyCorner(track: string, lapDistance: number): TrackCorner | null {
   return trackModel(track)?.corners.find(corner => lapDistance >= corner.entry && lapDistance <= corner.exit) ?? null;
 }
 
-export function analyzeSessionIntelligence(session: RecordedSession, personalBest?: { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null, expert?: DrivingReference | null): SessionIntelligence {
-  const model = trackModel(session.summary.track);
+export function analyzeSessionIntelligence(session: RecordedSession, personalBest?: { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null, expert?: DrivingReference | null, modelOverride?: TrackModel | null): SessionIntelligence {
+  const model = modelOverride ?? trackModel(session.summary.track);
   const completeLaps = session.summary.laps.filter(lap => lap.complete && lap.durationSeconds > 20);
   const referenceLap = completeLaps.sort((a, b) => a.durationSeconds - b.durationSeconds)[0]?.lap ?? null;
   const perLap = new Map<number, TelemetryFrame[]>();
@@ -65,7 +66,7 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
     personalBestSeconds: personalBest?.lapTimeSeconds ?? completeLaps[0]?.durationSeconds ?? null,
     theoreticalBestSeconds: theoreticalBest(completeLaps.map(lap => perLap.get(lap.lap) ?? [])),
     sessionObjective: objective(lowest), skills, corners, racecraft, setupFindings: setupFindings(relevantFrames, completeLaps.length, session.summary.consistencySeconds),
-    setupReport: buildSetupReport(session) };
+    setupReport: buildSetupReport(session), strategy: analyzeStrategy(session) };
 }
 
 function within(frames: TelemetryFrame[], corner: TrackCorner): TelemetryFrame[] { return frames.filter(frame => frame.lapDistance >= corner.entry && frame.lapDistance <= corner.exit); }
