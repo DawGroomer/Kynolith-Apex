@@ -44,14 +44,20 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
     const frames = within(perLap.get(lap.lap) ?? [], corner);
     const reference = within(referenceFrames, corner);
     if (frames.length < 3 || reference.length < 3) continue;
-    const timeSeconds = elapsed(frames), referenceSeconds = elapsed(reference), deltaSeconds = timeSeconds - referenceSeconds;
+    const currentWindow = interpolatedWindow(perLap.get(lap.lap) ?? [], corner.entry, corner.exit);
+    const referenceWindow = interpolatedWindow(referenceFrames, corner.entry, corner.exit);
+    if (!currentWindow || !referenceWindow) continue;
+    const timeSeconds = currentWindow.seconds, referenceSeconds = referenceWindow.seconds, deltaSeconds = timeSeconds - referenceSeconds;
+    const uncertaintySeconds = round3(currentWindow.uncertainty + referenceWindow.uncertainty);
+    const confidence = uncertaintySeconds <= .06 ? "high" : uncertaintySeconds <= .14 ? "moderate" : "low";
     const throttle = frames.find(frame => frame.lapDistance >= corner.apex && frame.throttle >= .7)?.lapDistance ?? null;
     const brake = frames.find(frame => frame.brake >= .15)?.lapDistance ?? null;
     const cueMessages = session.cues.filter(entry => entry.lap === lap.lap && entry.lapDistance >= corner.entry && entry.lapDistance <= corner.exit).map(entry => entry.cue.message);
     corners.push({ cornerId: corner.id, name: corner.name, lap: lap.lap, timeSeconds, deltaSeconds,
       minSpeedMph: Math.min(...frames.map(frame => frame.speedKph * MPH)), exitSpeedMph: frames.at(-1)!.speedKph * MPH,
       peakBrake: Math.max(...frames.map(frame => frame.brake)), brakePoint: brake, throttlePoint: throttle,
-      grade: deltaSeconds < -.08 ? "gain" : deltaSeconds > .15 ? "loss" : "clean", cueMessages });
+      grade: deltaSeconds < -Math.max(.08, uncertaintySeconds) ? "gain" : deltaSeconds > Math.max(.15, uncertaintySeconds) ? "loss" : "clean", cueMessages,
+      uncertaintySeconds, confidence });
   }
   const braking = average(completeLaps.map(lap => lap.brakingSmoothness));
   const throttle = average(completeLaps.map(lap => lap.throttleSmoothness));
@@ -72,6 +78,25 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
 
 function within(frames: TelemetryFrame[], corner: TrackCorner): TelemetryFrame[] { return frames.filter(frame => frame.lapDistance >= corner.entry && frame.lapDistance <= corner.exit); }
 function elapsed(frames: TelemetryFrame[]): number { return Math.max(0, (frames.at(-1)!.timestamp - frames[0]!.timestamp) / 1000); }
+export function interpolatedWindow(frames: TelemetryFrame[], start: number, end: number): { seconds: number; uncertainty: number } | null {
+  const ordered = frames.slice().sort((a, b) => a.lapDistance - b.lapDistance);
+  const startTime = interpolateTime(ordered, start), endTime = interpolateTime(ordered, end);
+  if (startTime === null || endTime === null || endTime <= startTime) return null;
+  const intervals = ordered.slice(1).map((frame, index) => frame.timestamp - ordered[index]!.timestamp).filter(value => value > 0 && value < 2_000);
+  const uncertainty = intervals.length ? median(intervals) / 2_000 : .25;
+  return { seconds: (endTime - startTime) / 1000, uncertainty };
+}
+function interpolateTime(frames: TelemetryFrame[], distance: number): number | null {
+  for (let index = 1; index < frames.length; index++) {
+    const a = frames[index - 1]!, b = frames[index]!;
+    if (a.lapDistance > distance || b.lapDistance < distance || b.lapDistance <= a.lapDistance) continue;
+    const ratio = (distance - a.lapDistance) / (b.lapDistance - a.lapDistance);
+    return a.timestamp + (b.timestamp - a.timestamp) * ratio;
+  }
+  return null;
+}
+function median(values: number[]): number { const sorted = values.slice().sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] ?? 0; }
+function round3(value: number): number { return Math.round(value * 1_000) / 1_000; }
 function average(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
 function clamp(value: number): number { return Math.round(Math.max(0, Math.min(100, value))); }
 function theoreticalBest(laps: TelemetryFrame[][]): number | null {

@@ -9,6 +9,8 @@ let bridgeProcess;
 let bridgeRestartTimer;
 let telemetryWatchdog;
 let quitting = false;
+const singleInstance = app.requestSingleInstanceLock();
+if (!singleInstance) app.quit();
 
 async function createWindow() {
   process.env.KYNOLITH_DESKTOP = "1";
@@ -24,7 +26,7 @@ async function createWindow() {
       ? path.join(process.resourcesPath, "models")
       : path.join(appRoot, "offline-models")
   });
-  startTelemetryBridge(coachServer.port);
+  startTelemetryBridge(coachServer);
 
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(permission === "media");
@@ -48,34 +50,32 @@ async function createWindow() {
   await win.loadURL(`http://127.0.0.1:${coachServer.port}`);
 }
 
-function startTelemetryBridge(port) {
+function startTelemetryBridge(server) {
   const executable = app.isPackaged
     ? path.join(process.resourcesPath, "bridge", "Kynolith.LmuBridge.exe")
     : path.join(app.getAppPath(), "bridge", "publish", "Kynolith.LmuBridge.exe");
   let lastFrameAt = 0;
   bridgeProcess = spawn(executable, [], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   const lines = readline.createInterface({ input: bridgeProcess.stdout });
-  lines.on("line", async line => {
+  lines.on("line", line => {
     try {
       const frame = JSON.parse(line);
       if (!Number.isFinite(frame.timestamp) || !Number.isFinite(frame.speedKph)) return;
       lastFrameAt = Date.now();
-      await fetch(`http://127.0.0.1:${port}/api/telemetry`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(frame)
-      });
+      server.ingestTelemetry(frame);
     } catch { /* Ignore partial or diagnostic output; bridge reconnects independently. */ }
   });
   bridgeProcess.stderr.on("data", chunk => process.stderr.write(`[LMU bridge] ${chunk}`));
   telemetryWatchdog = setInterval(() => {
     if (lastFrameAt && Date.now() - lastFrameAt > 2500) {
       lastFrameAt = 0;
-      fetch(`http://127.0.0.1:${port}/api/telemetry/disconnect`, { method: "POST" }).catch(() => {});
+      server.disconnectTelemetry().catch(() => {});
     }
   }, 1000);
   bridgeProcess.on("exit", () => {
     clearInterval(telemetryWatchdog);
-    fetch(`http://127.0.0.1:${port}/api/telemetry/disconnect`, { method: "POST" }).catch(() => {});
-    if (!quitting) bridgeRestartTimer = setTimeout(() => startTelemetryBridge(port), 2000);
+    server.disconnectTelemetry().catch(() => {});
+    if (!quitting) bridgeRestartTimer = setTimeout(() => startTelemetryBridge(server), 2000);
   });
 }
 

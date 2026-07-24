@@ -1,6 +1,7 @@
 export type SessionType = "practice" | "qualifying" | "race" | "unknown";
 
 export interface TelemetryFrame {
+  schemaVersion?: number;
   timestamp: number;
   session: SessionType;
   track: string;
@@ -17,6 +18,7 @@ export interface TelemetryFrame {
   steering: number;
   lateralG: number;
   longitudinalG: number;
+  yawRateRadPerSec?: number;
   lateralSpeedKph?: number;
   impactMagnitude?: number;
   impactTimestamp?: number;
@@ -25,6 +27,22 @@ export interface TelemetryFrame {
   tireWear: [number, number, number, number];
   tirePressurePsi: [number, number, number, number];
   brakeTempF: [number, number, number, number];
+  wheelRotationRadPerSec?: [number, number, number, number];
+  wheelSlipRatio?: [number, number, number, number];
+  wheelGripFraction?: [number, number, number, number];
+  wheelBrakePressure?: [number, number, number, number];
+  wheelDetached?: [boolean, boolean, boolean, boolean];
+  wheelFlat?: [boolean, boolean, boolean, boolean];
+  absActive?: boolean;
+  tcActive?: boolean;
+  batteryChargePercent?: number | null;
+  electricMotorState?: number;
+  electricMotorTorqueNm?: number;
+  virtualEnergyPercent?: number | null;
+  rearBrakeBiasPercent?: number;
+  damageSeverity?: number;
+  partDetached?: boolean;
+  overheating?: boolean;
   position: number;
   classPosition: number;
   vehicleClass?: string;
@@ -43,6 +61,18 @@ export interface TelemetryFrame {
   offTrackWheels: number;
   trackLimitsSteps: number;
   lapInvalidated: boolean;
+  blueFlag?: boolean;
+  sectorYellow?: boolean;
+  yellowFlagState?: number;
+  gamePhase?: number;
+  penalties?: number;
+  pitState?: number;
+  raining?: number;
+  trackWetness?: number;
+  ambientTempC?: number;
+  trackTempC?: number;
+  sessionTimeRemainingSeconds?: number;
+  trackLengthMeters?: number;
 }
 
 export interface RecordedLap {
@@ -98,6 +128,8 @@ export interface CornerPerformance {
   throttlePoint: number | null;
   grade: "gain" | "clean" | "loss";
   cueMessages: string[];
+  uncertaintySeconds: number;
+  confidence: "low" | "moderate" | "high";
 }
 
 export interface SessionIntelligence {
@@ -124,6 +156,8 @@ export interface StrategyReport {
   tireWearPerLapPercent: number | null;
   paceTrendSecondsPerLap: number | null;
   projectedStintLaps: number | null;
+  virtualEnergyPerLapPercent: number | null;
+  estimatedEnergyLapsRemaining: number | null;
   recommendation: string;
 }
 

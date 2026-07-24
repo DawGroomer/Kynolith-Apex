@@ -1,7 +1,7 @@
 {
   "name": "kynolith-lmu-coach",
   "productName": "Kynolith Apex LMU Coach",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Real-time Le Mans Ultimate driving coach with live telemetry and conversational voice.",
   "author": "Kynolith LLC",
   "private": true,
@@ -11,6 +11,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "test": "tsx --test src/*.test.ts",
+    "test:soak": "tsx scripts/soak-telemetry.ts --minutes=60",
+    "test:soak:accelerated": "tsx scripts/soak-telemetry.ts --minutes=60 --accelerated",
     "test:local-ai": "tsx scripts/test-local-ai.ts",
     "test:local-voice": "tsx scripts/test-local-voice.ts",
     "models:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stage-offline-models.ps1",

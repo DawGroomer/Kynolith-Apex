@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeSessionIntelligence, identifyCorner, trackModel } from "./track-intelligence.js";
+import { analyzeSessionIntelligence, identifyCorner, interpolatedWindow, trackModel } from "./track-intelligence.js";
 import { simulatedFrame } from "./simulator.js";
 import type { RecordedSession } from "./types.js";
 
@@ -30,4 +30,11 @@ test("expert reference takes priority without replacing personal best", () => {
   const result = analyzeSessionIntelligence(session, { label: "PB", lapTimeSeconds: 99, frames }, { id: "reference-x", name: "Expert", track: "Fuji Speedway", vehicle: "test", importedAt: 1, lapTimeSeconds: 95, frames });
   assert.equal(result.reference?.source, "expert");
   assert.equal(result.personalBestSeconds, 99);
+});
+
+test("distance interpolation removes sample-boundary timing error and reports uncertainty", () => {
+  const frames = Array.from({ length: 11 }, (_, index) => ({ ...simulatedFrame(1_000 + index * 100), lapDistance: index / 10 }));
+  const window = interpolatedWindow(frames, .15, .85);
+  assert.equal(window?.seconds, .7);
+  assert.equal(window?.uncertainty, .05);
 });

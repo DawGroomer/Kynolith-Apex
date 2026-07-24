@@ -22,6 +22,8 @@ export class CoachingEngine {
   private leftSeen = 0; private rightSeen = 0; private leftClear = 0; private rightClear = 0;
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
   private lastImpactTimestamp = 0; private impactInitialized = false; private spinSeen = 0; private spinClear = 0; private spinActive = false; private lastIncidentAt = 0;
+  private blueActive = false; private sectorYellowActive = false; private damageActive = false; private overheatingActive = false;
+  private penalties = 0; private penaltiesInitialized = false; private rainBand = 0; private lockupSeen = 0;
 
   setInstructionMode(mode: "quiet" | "balanced" | "active"): void {
     this.instructionMode = mode;
@@ -39,6 +41,21 @@ export class CoachingEngine {
     if (!this.lastGuidanceAt) this.lastGuidanceAt = frame.timestamp;
     if (frame.yellowFlag && !this.yellowActive) this.emit(cues, frame, "yellow", 0, "critical", "safety", "Yellow flag. No overtaking; reduce pace and watch for stopped cars.");
     this.yellowActive = frame.yellowFlag;
+    if (frame.sectorYellow && !frame.yellowFlag && !this.sectorYellowActive) this.emit(cues, frame, "local-yellow", 0, "critical", "safety", "Local yellow. No overtaking. Be ready for an incident.");
+    this.sectorYellowActive = Boolean(frame.sectorYellow);
+    if (frame.blueFlag && !this.blueActive) this.emit(cues, frame, "blue-flag", 0, "race", "racecraft", "Blue flag. Faster car approaching. Stay predictable.");
+    this.blueActive = Boolean(frame.blueFlag);
+    if (this.penaltiesInitialized && (frame.penalties ?? 0) > this.penalties) this.emit(cues, frame, "new-penalty", 0, "critical", "safety", "New penalty. Check the message center and serve it within the required window.");
+    this.penalties = frame.penalties ?? 0; this.penaltiesInitialized = true;
+    const severeDamage = Boolean(frame.partDetached || frame.wheelDetached?.some(Boolean) || frame.wheelFlat?.some(Boolean));
+    if (severeDamage && !this.damageActive) this.emit(cues, frame, "severe-damage", 0, "critical", "safety", frame.wheelFlat?.some(Boolean) ? "Puncture detected. Reduce speed and return to the pits safely." : "Severe damage detected. Stabilize the car and return to the pits.");
+    this.damageActive = severeDamage;
+    if (frame.overheating && !this.overheatingActive) this.emit(cues, frame, "overheating", 0, "critical", "safety", "Car overheating. Reduce load and prepare to pit.");
+    this.overheatingActive = Boolean(frame.overheating);
+    const nextRainBand = (frame.raining ?? 0) >= .35 ? 2 : (frame.raining ?? 0) >= .05 ? 1 : 0;
+    if (nextRainBand > this.rainBand) this.emit(cues, frame, "rain-increase", 20_000, "race", "tires", nextRainBand === 2 ? "Rain increasing. Expect standing water and a longer braking distance." : "Rain beginning. Check grip before committing to the next braking zone.");
+    else if (nextRainBand < this.rainBand) this.emit(cues, frame, "rain-ease", 20_000, "info", "tires", "Rain easing. Grip may recover unevenly; stay off painted lines.");
+    this.rainBand = nextRainBand;
     this.leftSeen = frame.carLeft ? this.leftSeen + 1 : 0; this.rightSeen = frame.carRight ? this.rightSeen + 1 : 0;
     this.leftClear = frame.carLeft ? 0 : this.leftClear + 1; this.rightClear = frame.carRight ? 0 : this.rightClear + 1;
     if (this.leftSeen === 3 && !this.carLeftActive) { this.carLeftActive = true; this.emit(cues, frame, "car-left", 3_000, "critical", "racecraft", "Car left. Hold your line."); }
@@ -76,6 +93,11 @@ export class CoachingEngine {
     if (frame.inPits && frame.speedKph > 80) this.emit(cues, frame, "pit-speed", 4_000, "critical", "safety", "Pit lane speed. Brake now and engage the limiter.");
 
     const prev = this.history.at(-2)?.frame;
+    const wheelSlip = frame.wheelSlipRatio ?? [0, 0, 0, 0];
+    const locking = frame.brake > .35 && frame.speedKph > 60 && wheelSlip.some(value => value < -.22);
+    this.lockupSeen = locking ? this.lockupSeen + 1 : 0;
+    if (this.lockupSeen === 3) this.emit(cues, frame, "wheel-lock", 12_000, "technique", "braking", "Wheel locking. Ease brake pressure slightly.");
+    if (frame.tcActive && frame.throttle > .65 && Math.abs(frame.steering) > .2) this.emit(cues, frame, "tc-active", 15_000, "technique", "throttle", "Traction control is working. Unwind the wheel before adding more throttle.");
     if (prev && this.instructionMode !== "active" && !frame.inPits) {
       const steeringDelta = Math.abs(frame.steering - prev.steering);
       if (frame.speedKph > 120 && steeringDelta > 0.22 && frame.brake < 0.1) {
@@ -115,8 +137,8 @@ export class CoachingEngine {
   }
 
   private emit(out: CoachingCue[], frame: TelemetryFrame, key: string, waitMs: number, priority: CoachingCue["priority"], category: CoachingCue["category"], message: string): void {
-    const last = this.cooldown.get(key) ?? 0;
-    if (frame.timestamp - last < waitMs) return;
+    const last = this.cooldown.get(key);
+    if (last !== undefined && frame.timestamp - last < waitMs) return;
     this.cooldown.set(key, frame.timestamp);
     out.push({
       id: `${key}-${frame.timestamp}`, at: frame.timestamp, priority, category, message, speak: true,

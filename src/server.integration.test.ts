@@ -16,7 +16,7 @@ test("desktop server records LMU frames and exposes session review", async () =>
       const timestamp = 1_000_000 + i * 150;
       const response = await fetch(`${base}/api/telemetry`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...simulatedFrame(timestamp), timestamp, lap: Math.floor(i / 80) + 1, lapDistance: (i % 80) / 80 }) });
-      assert.equal(response.status, 204);
+      assert.equal(response.status, 202);
     }
     await fetch(`${base}/api/telemetry/disconnect`, { method: "POST" });
     await new Promise(resolve => setTimeout(resolve, 80));

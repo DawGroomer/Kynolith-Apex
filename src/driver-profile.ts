@@ -1,5 +1,6 @@
 import type { SessionSummary } from "./types.js";
 import { curriculumForRank, type CurriculumLevel } from "./curriculum.js";
+import { applyScoreCalibration, type ScoreCalibration } from "./score-calibration.js";
 
 export interface DriverProfile {
   driverName: string; score: number | null; change: number | null; trend: "improved" | "declined" | "steady" | "new";
@@ -23,7 +24,7 @@ export interface DriverAcademy {
   telemetryFocus: string[];
 }
 
-export function buildDriverProfile(driverName: string, all: SessionSummary[]): DriverProfile {
+export function buildDriverProfile(driverName: string, all: SessionSummary[], calibration: ScoreCalibration | null = null): DriverProfile {
   const sessions = all.filter(session => session.laps.some(lap => lap.complete && lap.durationSeconds > 20));
   if (!sessions.length) return { driverName: driverName || "Driver", score: null, change: null, trend: "new", level: "Rookie",
     sessions: 0, completedLaps: 0, personalBests: 0, components: null, currentFocus: "Complete a clean timed session to establish your baseline.", history: [], academy: emptyAcademy() };
@@ -31,7 +32,7 @@ export function buildDriverProfile(driverName: string, all: SessionSummary[]): D
   for (const session of sessions) if (session.fastestLapSeconds) {
     const key = `${session.track}|${session.vehicle}`; bestByCombo.set(key, Math.min(bestByCombo.get(key) ?? Infinity, session.fastestLapSeconds));
   }
-  const scored = sessions.map(session => scoreSession(session, bestByCombo.get(`${session.track}|${session.vehicle}`) ?? null));
+  const scored = sessions.map(session => scoreSession(session, bestByCombo.get(`${session.track}|${session.vehicle}`) ?? null, calibration));
   const latest = scored[0]!;
   const previous = scored.slice(1).find(entry => entry.session.track === latest.session.track && entry.session.vehicle === latest.session.vehicle) ?? scored[1];
   const change = previous ? Math.round((latest.score - previous.score) * 10) / 10 : null;
@@ -90,13 +91,13 @@ function emptyAcademy(): DriverAcademy { return { rank: "Rookie", nextRank: "Dev
   drill: { name: "Clean Baseline", instructions: "Complete three clean representative laps.", success: "Three valid laps within one second." }, mastery: [],
   curriculumLevel: 0, phase: "Phase 1 — Fundamentals", phaseGoal: "Machine consistency, track memory, boundaries, and safe inputs.", telemetryFocus: ["racing line", "steering smoothness", "brake markers", "track boundaries"] }; }
 
-function scoreSession(session: SessionSummary, personalBest: number | null) {
+function scoreSession(session: SessionSummary, personalBest: number | null, calibration: ScoreCalibration | null) {
   const laps = session.laps.filter(lap => lap.complete);
   const braking = average(laps.map(lap => lap.brakingSmoothness));
   const throttle = average(laps.map(lap => lap.throttleSmoothness));
   const consistency = clamp(100 - (session.consistencySeconds ?? 5) * 8);
   const pace = session.fastestLapSeconds && personalBest ? clamp(100 - ((session.fastestLapSeconds - personalBest) / personalBest) * 500) : 60;
-  const components = { braking: round(braking), throttle: round(throttle), consistency: round(consistency), pace: round(pace) };
+  const components = applyScoreCalibration({ braking: round(braking), throttle: round(throttle), consistency: round(consistency), pace: round(pace) }, calibration);
   return { session, components, score: round(braking * .3 + throttle * .3 + consistency * .2 + pace * .2) };
 }
 function average(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 50; }

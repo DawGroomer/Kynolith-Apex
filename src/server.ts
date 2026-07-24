@@ -14,6 +14,8 @@ import { analyzeSessionIntelligence } from "./track-intelligence.js";
 import { ReferenceStore } from "./reference-store.js";
 import { TrackModelStore } from "./track-model-store.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
+import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
+import { ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 
 export interface CoachServerOptions {
@@ -26,6 +28,9 @@ export interface CoachServerOptions {
 
 export interface RunningCoachServer {
   port: number;
+  ingestTelemetry: (frame: TelemetryFrame) => boolean;
+  disconnectTelemetry: () => Promise<void>;
+  telemetryMetrics: () => PipelineMetrics;
   close: () => Promise<void>;
 }
 
@@ -44,6 +49,8 @@ const trackModels = new TrackModelStore(path.join(dataDir, "track-models"));
 await trackModels.initialize();
 const settings = new SettingsStore(path.join(dataDir, "settings.json"));
 await settings.initialize();
+const calibration = new ScoreCalibrationStore(path.join(dataDir, "score-calibration.json"));
+await calibration.initialize();
 scheduler.setMinimumSpacing(spacingFor(settings.get().speechFrequency));
 engine.setInstructionMode(settings.get().speechFrequency);
 const localAi = new LocalAi(path.join(dataDir, "models"), {
@@ -53,11 +60,14 @@ const localAi = new LocalAi(path.join(dataDir, "models"), {
 let welcomedSessionKey = "";
 let neuralSpeechBusy = false;
 let lastStrongLanguageAt = 0;
-const state: CoachState = { connected: true, source: "simulator", frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
+const state: CoachState = { connected: false, source: "simulator", frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
+const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(256, processFrame);
+const acceptTelemetry = (frame: TelemetryFrame): boolean => { state.connected = true; state.source = "lmu"; return telemetryPipeline.push(frame); };
 
 app.use(express.json({ limit: "25mb" }));
 app.use(express.static(options.publicDir ?? path.resolve("public")));
 app.get("/api/state", (_req, res) => res.json(state));
+app.get("/api/telemetry/health", (_req, res) => res.json(telemetryPipeline.snapshot()));
 app.get("/api/settings", (_req, res) => res.json(settings.get()));
 app.put("/api/settings", async (req, res) => {
   try {
@@ -80,23 +90,30 @@ app.get("/api/local/status", (_req, res) => {
 app.post("/api/telemetry", (req, res) => {
   const frame = req.body as TelemetryFrame;
   if (!Number.isFinite(frame.timestamp) || !Number.isFinite(frame.speedKph)) return res.status(400).json({ error: "Invalid telemetry frame" });
-  state.connected = true; state.source = "lmu"; processFrame(frame); res.sendStatus(204);
+  if (!acceptTelemetry(frame)) return res.status(409).json({ error: "Telemetry frame rejected" });
+  res.sendStatus(202);
 });
-app.post("/api/telemetry/disconnect", (_req, res) => {
+app.post("/api/telemetry/disconnect", async (_req, res) => {
+  await telemetryPipeline.idle();
   state.connected = false;
   state.source = "simulator";
-  void recorder.finish();
+  await recorder.finish();
   res.sendStatus(204);
 });
 app.get("/api/sessions", async (_req, res) => res.json(await recorder.list()));
-app.get("/api/profile", async (_req, res) => res.json(buildDriverProfile(settings.get().driverName, await recorder.list())));
+app.get("/api/profile", async (_req, res) => res.json(buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get())));
+app.get("/api/calibration", (_req, res) => res.json(calibration.get() ?? { status: "uncalibrated", minimumExpertLabels: 3 }));
+app.post("/api/calibration/import", async (req, res) => {
+  try { res.status(201).json(await calibration.import((req.body?.labels ?? []) as ExpertLabel[])); }
+  catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid calibration labels" }); }
+});
 app.get("/api/sessions/:id", async (req, res) => {
   const session = await recorder.get(req.params.id);
   if (!session) return res.status(404).json({ error: "Session not found" });
   const personal = selectPersonalBest(await recorder.comparable(session.summary.track, session.summary.vehicle));
   const expert = await references.matching(session.summary.track, session.summary.vehicle);
   const model = await trackModels.resolve(session);
-  const profile = buildDriverProfile(settings.get().driverName, await recorder.list());
+  const profile = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get());
   res.json({ ...session, intelligence: analyzeSessionIntelligence(session, personal, expert, model, profile.academy.rank) });
 });
 app.get("/api/references", async (_req, res) => res.json(await references.list()));
@@ -144,7 +161,7 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   if (state.source === "lmu" && sessionKey !== welcomedSessionKey) {
     welcomedSessionKey = sessionKey;
     const name = settings.get().driverName;
-    const academy = buildDriverProfile(name, await recorder.list()).academy;
+    const academy = buildDriverProfile(name, await recorder.list(), calibration.get()).academy;
     engine.setCurriculumLevel(academy.curriculumLevel);
     scheduler.enqueue([{
       id: `welcome-${frame.timestamp}`, at: frame.timestamp, priority: "info", category: "lap",
@@ -196,7 +213,7 @@ async function answerSessionQuestion(question: string, sessionId: string): Promi
   const personal = selectPersonalBest(await recorder.comparable(session.summary.track, session.summary.vehicle));
   const expert = await references.matching(session.summary.track, session.summary.vehicle);
   const model = await trackModels.resolve(session);
-  const profile = buildDriverProfile(settings.get().driverName, await recorder.list());
+  const profile = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get());
   const intelligence = analyzeSessionIntelligence(session, personal, expert, model, profile.academy.rank);
   const drill = intelligence.curriculum.focusedDrill;
   if (/technique score/.test(q)) {
@@ -227,6 +244,9 @@ const address = server.address();
 if (!address || typeof address === "string") throw new Error("Coach server did not bind to TCP");
 return {
   port: address.port,
+  ingestTelemetry: acceptTelemetry,
+  telemetryMetrics: () => telemetryPipeline.snapshot(),
+  disconnectTelemetry: async () => { await telemetryPipeline.idle(); state.connected = false; state.source = "simulator"; await recorder.finish(); },
   close: async () => {
     clearInterval(simulatorTimer);
     await recorder.finish();

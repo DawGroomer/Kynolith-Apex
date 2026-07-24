@@ -14,7 +14,7 @@ Open `http://127.0.0.1:4377`. The dashboard starts with a simulator source so UI
 
 ## Architecture
 
-1. **LMU bridge (C++/Windows):** reads the first-party `LMU_Data` mapping after `LMU_Data_Event`; it compiles against the locally installed Studio 397 headers, which are not copied into this repository.
+1. **LMU bridge (C#/.NET/Windows):** reads LMU telemetry and scoring shared memory, validates LMU 3.8 structure sizes, and emits schema-versioned frames at approximately 67 Hz.
 2. **Coaching core (TypeScript):** reduces high-rate telemetry into explainable events with severity, cooldown, and interruption rules.
    Its priority, expiry, revalidation, and hard-section scheduling model is informed by Crew Chief V4; see `THIRD_PARTY_NOTICES.md`.
 3. **Local AI provider:** runs Whisper transcription and a guarded Qwen LMU knowledge router on the driver's machine with no inference API key.
@@ -39,7 +39,16 @@ The **Settings** tab persists the selected American Windows voice, volume, rate,
 - Local rules always own yellow flags, pit-speed warnings, unsafe control inputs, and cue throttling.
 - Voice output is short and suppressed by cooldowns; a model never controls the car.
 - Safety and race-control calls outrank technique and lap-time advice.
-- Raw 100 Hz telemetry remains local. The voice session receives only selected cues and summaries.
+- Raw high-rate telemetry remains local. A bounded single-consumer pipeline preserves frame order, applies backpressure, and exposes accepted, processed, dropped, out-of-order, queue-depth, and latency metrics.
+
+## Class A validation
+
+- `pnpm test` includes deterministic coaching tests and a sanitized LMU race-control fixture replay.
+- `pnpm test:soak:accelerated` processes one hour of 67 Hz telemetry (241,200 frames) with ordering, drop, queue, latency, and memory assertions.
+- `pnpm test:soak` runs the same workload in real time for release-candidate validation.
+- Corner comparisons interpolate exact distance boundaries and report uncertainty and confidence.
+- Expert-labelled score sets can be imported through `/api/calibration/import`; calibration error is retained for every skill model.
+- Tagged GitHub releases are Authenticode signed when the Kynolith certificate and password secrets are configured.
 
 ## Desktop build
 

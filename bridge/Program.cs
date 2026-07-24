@@ -110,17 +110,30 @@ internal static class Program
         var (carLeft, carRight) = CarsAlongside(playerScore, scoringVehicles, scoringCount);
         var traffic = NearestTraffic(playerScore, scoringVehicles, scoringCount, trackLength);
         var offTrackWheels = tires.Count(wheel => wheel.mSurfaceType is >= 2 and <= 4);
+        var wheelRotation = Enumerable.Range(0, 4).Select(i => i < tires.Length ? tires[i].mRotation : 0).ToArray();
+        var wheelSlip = Enumerable.Range(0, 4).Select(i => i < tires.Length ? SlipRatio(tires[i]) : 0).ToArray();
+        var wheelGrip = Enumerable.Range(0, 4).Select(i => i < tires.Length ? Math.Clamp(tires[i].mGripFract, 0, 1) : 0).ToArray();
+        var wheelBrakePressure = Enumerable.Range(0, 4).Select(i => i < tires.Length ? Clamp01(tires[i].mBrakePressure) : 0).ToArray();
+        var wheelDetached = Enumerable.Range(0, 4).Select(i => i < tires.Length && tires[i].mDetached != 0).ToArray();
+        var wheelFlat = Enumerable.Range(0, 4).Select(i => i < tires.Length && tires[i].mFlat != 0).ToArray();
+        var dentSeverity = car.mDentSeverity?.Sum(value => (int)value) ?? 0;
 
         return new
         {
-            timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), session,
+            schemaVersion = 2, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), session,
             track = Decode(scoring.mScoringInfo.mTrackName), vehicle = Decode(car.mVehicleName),
             lap = Math.Max(1, playerScore.mTotalLaps + 1), lapDistance, worldX = car.mPos.x, worldZ = car.mPos.z, speedKph = speed,
             gear = car.mGear, rpm = car.mEngineRPM, throttle = Clamp01(car.mUnfilteredThrottle),
             brake = Clamp01(car.mUnfilteredBrake), steering = Math.Clamp(car.mUnfilteredSteering, -1, 1),
-            lateralG = car.mLocalAccel.x / Gravity, longitudinalG = -car.mLocalAccel.z / Gravity,
+            lateralG = car.mLocalAccel.x / Gravity, longitudinalG = -car.mLocalAccel.z / Gravity, yawRateRadPerSec = car.mLocalRot.y,
             lateralSpeedKph = car.mLocalVel.x * 3.6, impactMagnitude = car.mLastImpactMagnitude, impactTimestamp = car.mLastImpactET,
             fuelLiters = Math.Max(0, car.mFuel), tireTempC = tireTemps, tireWear, tirePressurePsi, brakeTempF,
+            wheelRotationRadPerSec = wheelRotation, wheelSlipRatio = wheelSlip, wheelGripFraction = wheelGrip, wheelBrakePressure,
+            wheelDetached, wheelFlat, absActive = car.mABSActive != 0, tcActive = car.mTCActive != 0,
+            batteryChargePercent = car.mElectricBoostMotorState == 0 ? (double?)null : Math.Clamp(car.mBatteryChargeFraction * 100, 0, 100),
+            electricMotorState = (int)car.mElectricBoostMotorState, electricMotorTorqueNm = car.mElectricBoostMotorTorque,
+            virtualEnergyPercent = playerScore.mFuelFraction / 255.0 * 100.0, rearBrakeBiasPercent = car.mRearBrakeBias * 100,
+            damageSeverity = dentSeverity, partDetached = car.mDetached != 0, overheating = car.mOverheating != 0,
             position = Math.Max(1, (int)playerScore.mPlace), classPosition, vehicleClass,
             gapAheadSeconds = ValidGap(car.mTimeGapCarAhead), gapBehindSeconds = ValidGap(car.mTimeGapCarBehind),
             opponentAheadClass = traffic.AheadClass, opponentBehindClass = traffic.BehindClass,
@@ -129,7 +142,13 @@ internal static class Program
             // LMU's yellow-state and sector arrays can retain transitional/stale
             // values. Game phase 6 is the authoritative active FCY/safety-car state.
             inPits = playerScore.mInPits != 0, yellowFlag = scoring.mScoringInfo.mGamePhase == 6, carLeft, carRight,
-            offTrackWheels, trackLimitsSteps = (int)car.mTrackLimitsSteps, lapInvalidated = car.mLapInvalidated != 0
+            offTrackWheels, trackLimitsSteps = (int)car.mTrackLimitsSteps, lapInvalidated = car.mLapInvalidated != 0,
+            blueFlag = playerScore.mFlag == 6, sectorYellow = scoring.mScoringInfo.mSectorFlag?.Any(value => value > 0) == true,
+            yellowFlagState = (int)scoring.mScoringInfo.mYellowFlagState, gamePhase = (int)scoring.mScoringInfo.mGamePhase,
+            penalties = (int)playerScore.mNumPenalties, pitState = (int)playerScore.mPitState,
+            raining = scoring.mScoringInfo.mRaining, trackWetness = scoring.mScoringInfo.mAvgPathWetness,
+            ambientTempC = scoring.mScoringInfo.mAmbientTemp, trackTempC = scoring.mScoringInfo.mTrackTemp,
+            sessionTimeRemainingSeconds = scoring.mScoringInfo.mSessionTimeRemaining, trackLengthMeters = trackLength
         };
     }
 
@@ -188,6 +207,11 @@ internal static class Program
     }
 
     private static double? ValidGap(float value) => float.IsFinite(value) && value >= 0 && value < 3600 ? value : null;
+    private static double SlipRatio(rF2Wheel wheel)
+    {
+        var ground = wheel.mLongitudinalGroundVel;
+        return Math.Clamp((wheel.mLongitudinalPatchVel - ground) / Math.Max(1.0, Math.Abs(ground)), -3.0, 3.0);
+    }
     private static double Clamp01(double value) => Math.Clamp(double.IsFinite(value) ? value : 0, 0, 1);
     private static double Square(double value) => value * value;
     private static bool IsLmuRunning() => Process.GetProcessesByName("Le Mans Ultimate").Length > 0 || Process.GetProcessesByName("LeMansUltimate").Length > 0;

@@ -78,3 +78,19 @@ test("impact telemetry produces crash recovery guidance", () => {
   assert.equal(cues.some(cue => cue.id.startsWith("impact-") && cue.message.startsWith("Impact.")), true);
   assert.equal(cues.some(cue => cue.id.startsWith("track-edge-")), false);
 });
+
+test("race control distinguishes local yellow, blue flag, and a new penalty", () => {
+  const engine = new CoachingEngine();
+  const first = engine.ingest({ ...simulatedFrame(500_000), sectorYellow: true, blueFlag: true, penalties: 0 });
+  const second = engine.ingest({ ...simulatedFrame(500_100), sectorYellow: true, blueFlag: true, penalties: 1 });
+  assert.equal(first.some(cue => cue.id.startsWith("local-yellow-")), true);
+  assert.equal(first.some(cue => cue.id.startsWith("blue-flag-")), true);
+  assert.equal(second.some(cue => cue.id.startsWith("new-penalty-")), true);
+});
+
+test("wheel and weather telemetry produce actionable safety calls", () => {
+  const engine = new CoachingEngine();
+  const damage = engine.ingest({ ...simulatedFrame(600_000), wheelFlat: [true, false, false, false], raining: .4 });
+  assert.equal(damage.some(cue => cue.id.startsWith("severe-damage-") && cue.priority === "critical"), true);
+  assert.equal(damage.some(cue => cue.id.startsWith("rain-increase-")), true);
+});
