@@ -1,0 +1,18 @@
+.intelligence-grid { display:grid; grid-template-columns:2fr 1fr 1fr 2fr; gap:14px; margin-top:14px; }
+.intelligence-grid article { min-height:150px; }
+.skill-model { display:grid; gap:7px; }
+.skill-model div { display:grid; grid-template-columns:1fr 120px 32px; gap:8px; align-items:center; text-transform:capitalize; }
+.skill-model meter { width:100%; }
+.corner-dot { stroke:#071014; stroke-width:3; }
+.corner-dot.gain { fill:#38f29b; }
+.corner-dot.clean { fill:var(--cyan); }
+.corner-dot.loss { fill:var(--red); }
+.corner-label { fill:#dffaff; font-size:10px; paint-order:stroke; stroke:#071014; stroke-width:3px; }
+.corner-loss { background:#2a1118; }
+.corner-gain { background:#0b211b; }
+@media(max-width:950px) { .intelligence-grid { grid-template-columns:1fr; } }
+.reference-import { display:grid; grid-template-columns:1fr auto auto; gap:20px; align-items:center; min-height:0; margin-top:14px; }
+.reference-import h3 { margin:0 0 5px; }
+.reference-file { color:var(--muted); font-size:11px; letter-spacing:.12em; }
+.reference-file input { display:block; margin-top:8px; max-width:260px; }
+@media(max-width:950px) { .reference-import { grid-template-columns:1fr; } }

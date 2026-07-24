@@ -1,0 +1,72 @@
+{
+  "name": "kynolith-lmu-coach",
+  "productName": "Kynolith Apex LMU Coach",
+  "version": "0.1.0",
+  "description": "Real-time Le Mans Ultimate driving coach with live telemetry and conversational voice.",
+  "author": "Kynolith LLC",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "tsx --test src/*.test.ts",
+    "test:local-ai": "tsx scripts/test-local-ai.ts",
+    "test:local-voice": "tsx scripts/test-local-voice.ts",
+    "models:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stage-offline-models.ps1",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "build:bridge": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-bridge.ps1",
+    "desktop": "electron .",
+    "dist:win": "pnpm build:bridge && pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
+    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "express": "^5.1.0",
+    "kokoro-js": "1.2.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.7.2",
+    "@types/ws": "^8.18.1",
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "com.kynolith.apex.lmucoach",
+    "productName": "Kynolith Apex LMU Coach",
+    "asar": true,
+    "compression": "store",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "extraResources": [
+      {
+        "from": "bridge/publish/Kynolith.LmuBridge.exe",
+        "to": "bridge/Kynolith.LmuBridge.exe"
+      },
+      {
+        "from": "offline-models",
+        "to": "models",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "artifactName": "Kynolith-Apex-LMU-Coach-${version}-portable.${ext}"
+    }
+  }
+}

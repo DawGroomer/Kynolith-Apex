@@ -1,0 +1,2 @@
+#microphoneLevel{width:100%;height:22px;accent-color:var(--cyan)}#testMicrophone:disabled{opacity:.55;cursor:wait}
+.identity-card{margin-bottom:14px;min-height:0}.identity-card label{display:grid;gap:8px;color:var(--muted);font-weight:600}.identity-card input{max-width:420px;background:#071014;border:1px solid var(--line);color:#e7f7fa;padding:11px;font:inherit}
