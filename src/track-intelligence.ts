@@ -73,7 +73,7 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
     personalBestSeconds: personalBest?.lapTimeSeconds ?? completeLaps[0]?.durationSeconds ?? null,
     theoreticalBestSeconds: theoreticalBest(completeLaps.map(lap => perLap.get(lap.lap) ?? [])),
     sessionObjective: objective(lowest), skills, corners, racecraft, setupFindings: setupFindings(relevantFrames, completeLaps.length, session.summary.consistencySeconds),
-    setupReport: buildSetupReport(session), strategy: analyzeStrategy(session), curriculum: assessCurriculum(curriculumRank, relevantFrames, corners) };
+    setupReport: buildSetupReport(session), strategy: analyzeStrategy(session), curriculum: assessCurriculum(curriculumRank, relevantFrames, corners, median(relevantFrames.map(frame => frame.trackLengthMeters ?? 0).filter(value => value > 0))) };
 }
 
 function within(frames: TelemetryFrame[], corner: TrackCorner): TelemetryFrame[] { return frames.filter(frame => frame.lapDistance >= corner.entry && frame.lapDistance <= corner.exit); }

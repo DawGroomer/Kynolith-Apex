@@ -19,9 +19,11 @@ test("technique scoring penalizes abrupt loaded inputs", () => {
   assert.ok(good.trailBrake > bad.trailBrake);
 });
 
-test("focused drill selects the largest repeatable corner loss and targets eighty percent", () => {
+test("focused drill selects the largest repeatable corner loss and sets a staged recovery target", () => {
   const corner = (id: string, name: string, deltaSeconds: number): CornerPerformance => ({ cornerId: id, name, lap: 2, timeSeconds: 5, deltaSeconds, minSpeedMph: 60, exitSpeedMph: 80, peakBrake: .7, brakePoint: .1, throttlePoint: .2, grade: "loss", cueMessages: [], uncertaintySeconds: .1, confidence: "moderate" });
   const drill = selectFocusedCorner([corner("one", "Turn 1", .1), corner("two", "Dunlop", .3), corner("two", "Dunlop", .2)]);
   assert.equal(drill?.corner, "Dunlop");
-  assert.equal(drill?.recoveryTargetSeconds, .2);
+  assert.equal(drill?.recoveryTargetSeconds, .05);
+  assert.equal(drill?.executionPlan.length, 3);
+  assert.match(drill?.successCriteria ?? "", /three consecutive clean laps/i);
 });

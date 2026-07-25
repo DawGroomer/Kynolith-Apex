@@ -274,7 +274,7 @@ async function answerSessionQuestion(question: string, sessionId: string): Promi
     return `Trail braking ${score.trailBrake}, steering efficiency ${score.steeringEfficiency}, and throttle squeeze ${score.throttleSqueeze} out of 100.`;
   }
   if (/current drill|what.*focus/.test(q)) return drill?.instruction ?? profile.academy.drill.instructions;
-  return drill ? `Your largest repeatable loss is ${drill.averageLossSeconds.toFixed(2)} seconds at ${drill.corner}. Focus there and target recovering ${drill.recoveryTargetSeconds.toFixed(2)} seconds.` : "I do not see a repeatable corner loss yet. Build another clean reference lap.";
+  return drill ? `${drill.corner} is the largest repeatable loss at ${drill.averageLossSeconds.toFixed(2)} seconds. ${drill.diagnosis} ${drill.executionPlan[0]} Target ${drill.recoveryTargetSeconds.toFixed(2)} seconds over three consistent laps.` : "I do not see a repeatable corner loss yet. Build another clean reference lap.";
 }
 
 function selectPersonalBest(sessions: import("./types.js").RecordedSession[]): { label: string; lapTimeSeconds: number; frames: TelemetryFrame[] } | null {
