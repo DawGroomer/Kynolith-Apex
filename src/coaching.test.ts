@@ -6,7 +6,7 @@ import { simulatedFrame } from "./simulator.js";
 test("yellow flag produces a critical safety cue", () => {
   const engine = new CoachingEngine();
   engine.ingest({ ...simulatedFrame(100_000), yellowFlag: true });
-  const cue = engine.ingest({ ...simulatedFrame(100_500), yellowFlag: true })[0];
+  const cue = engine.ingest({ ...simulatedFrame(100_100), yellowFlag: true })[0];
   assert.equal(cue?.priority, "critical");
   assert.equal(cue?.category, "safety");
 });
@@ -14,7 +14,7 @@ test("yellow flag produces a critical safety cue", () => {
 test("cooldown suppresses repeated yellow calls", () => {
   const engine = new CoachingEngine();
   assert.equal(engine.ingest({ ...simulatedFrame(100_000), yellowFlag: true }).length, 0);
-  assert.equal(engine.ingest({ ...simulatedFrame(100_500), yellowFlag: true }).length, 1);
+  assert.equal(engine.ingest({ ...simulatedFrame(100_100), yellowFlag: true }).length, 1);
   assert.equal(engine.ingest({ ...simulatedFrame(120_000), yellowFlag: true }).filter(cue => cue.id.startsWith("yellow-")).length, 0);
 });
 
@@ -53,10 +53,10 @@ test("coach checks in during otherwise clean running", () => {
 test("yellow warning resets only after a green frame", () => {
   const engine = new CoachingEngine();
   assert.equal(engine.ingest({ ...simulatedFrame(100_000), yellowFlag: true }).length, 0);
-  assert.equal(engine.ingest({ ...simulatedFrame(100_500), yellowFlag: true }).length, 1);
+  assert.equal(engine.ingest({ ...simulatedFrame(100_100), yellowFlag: true }).length, 1);
   assert.equal(engine.ingest({ ...simulatedFrame(101_000), yellowFlag: false }).length, 0);
   assert.equal(engine.ingest({ ...simulatedFrame(102_000), yellowFlag: true }).length, 0);
-  assert.equal(engine.ingest({ ...simulatedFrame(102_500), yellowFlag: true }).length, 1);
+  assert.equal(engine.ingest({ ...simulatedFrame(102_100), yellowFlag: true }).length, 1);
 });
 
 test("race control ignores a transient yellow during initialization", () => {
@@ -104,8 +104,8 @@ test("impact telemetry produces crash recovery guidance", () => {
 test("race control distinguishes local yellow, blue flag, and a new penalty", () => {
   const engine = new CoachingEngine();
   const initial = engine.ingest({ ...simulatedFrame(500_000), sectorYellow: true, blueFlag: true, penalties: 0 });
-  const first = engine.ingest({ ...simulatedFrame(500_500), sectorYellow: true, blueFlag: true, penalties: 0 });
-  const second = engine.ingest({ ...simulatedFrame(500_600), sectorYellow: true, blueFlag: true, penalties: 1 });
+  const first = engine.ingest({ ...simulatedFrame(500_100), sectorYellow: true, blueFlag: true, penalties: 0 });
+  const second = engine.ingest({ ...simulatedFrame(500_200), sectorYellow: true, blueFlag: true, penalties: 1 });
   assert.equal(first.some(cue => cue.id.startsWith("local-yellow-")), true);
   assert.equal([...initial, ...first].some(cue => cue.id.startsWith("blue-flag-")), true);
   assert.equal(second.some(cue => cue.id.startsWith("new-penalty-")), true);

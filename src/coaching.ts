@@ -43,7 +43,7 @@ export class CoachingEngine {
     if (!this.lastGuidanceAt) this.lastGuidanceAt = frame.timestamp;
     if (frame.yellowFlag) {
       if (!this.yellowActive && !this.yellowSeenAt) this.yellowSeenAt = frame.timestamp;
-      if (!this.yellowActive && frame.timestamp - this.yellowSeenAt >= 500) {
+      if (!this.yellowActive && frame.timestamp - this.yellowSeenAt >= 100) {
         this.yellowActive = true;
         this.emit(cues, frame, "yellow", 0, "critical", "safety", "Yellow flag. No overtaking. Watch for stopped cars.");
       }
@@ -51,7 +51,7 @@ export class CoachingEngine {
     const localYellow = Boolean(frame.sectorYellow && !frame.yellowFlag);
     if (localYellow) {
       if (!this.sectorYellowActive && !this.sectorYellowSeenAt) this.sectorYellowSeenAt = frame.timestamp;
-      if (!this.sectorYellowActive && frame.timestamp - this.sectorYellowSeenAt >= 500) {
+      if (!this.sectorYellowActive && frame.timestamp - this.sectorYellowSeenAt >= 100) {
         this.sectorYellowActive = true;
         this.emit(cues, frame, "local-yellow", 0, "critical", "safety", "Local yellow. No overtaking. Watch for an incident.");
       }
