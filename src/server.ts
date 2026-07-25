@@ -68,8 +68,8 @@ let lastStrongLanguageAt = 0;
 let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
 const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
 const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(12, processFrame, 180);
-const voiceRuntime = new VoiceRuntime(path.join(dataDir, "voice-cache"), request => localAi.synthesize(request.text, request.voice, request.speed, request.role, request.emotion));
-const voiceRuntimeStats = { requests: 0, cacheHits: 0, failures: 0, fallbacks: 0, lastEngine: "none", lastVoice: "none", lastSynthesisMs: 0, lastQueueDelayMs: 0 };
+const voiceRuntime = new VoiceRuntime(path.join(dataDir, "voice-cache"), request => localAi.synthesize(request.text, request.voice, request.speed, request.role, request.emotion), () => os.freemem() >= 2 * 1024 ** 3);
+const voiceRuntimeStats = { requests: 0, cacheHits: 0, failures: 0, fallbacks: 0, cancellations: 0, drops: 0, lastEngine: "none", lastVoice: "none", lastSynthesisMs: 0, lastQueueDelayMs: 0 };
 const spotterWarmup = [
   ["car-left", "Car left. Hold your line."], ["car-right", "Car right. Hold your line."], ["clear-left", "Clear left."], ["clear-right", "Clear right."],
   ["yellow", "Yellow flag! No overtaking. Watch for stopped cars."], ["local-yellow", "Local yellow! No overtaking. Watch for an incident."],
@@ -183,7 +183,6 @@ app.post("/api/local/ask", async (req, res) => {
 });
 app.post("/api/local/speak", async (req, res) => {
   try {
-    if (os.freemem() < 2 * 1024 ** 3) return res.status(503).json({ error: "Memory guard blocked neural speech", code: "memory_guard" });
     const text = String(req.body?.text ?? "").trim().slice(0, 600);
     if (!text) return res.status(400).json({ error: "Speech text is required" });
     const voice = String(req.body?.voice ?? "af_heart").slice(0, 40);
@@ -211,7 +210,9 @@ app.post("/api/audio/delivery", (req, res) => {
     role: req.body?.role === "spotter" ? "spotter" : "coach", cacheHit: Boolean(req.body?.cacheHit), outcome: ["played", "cancelled", "dropped", "failed"].includes(req.body?.outcome) ? req.body.outcome : "played",
     fallbackReason: req.body?.fallbackReason ? String(req.body.fallbackReason).slice(0, 160) : null, deadlineMet: telemetryToPlaybackMs != null && telemetryToPlaybackMs <= 200
   };
-  if (metric.fallbackReason) voiceRuntimeStats.fallbacks++;
+  if (metric.outcome === "cancelled") voiceRuntimeStats.cancellations++;
+  else if (metric.outcome === "dropped") voiceRuntimeStats.drops++;
+  else if (metric.engine === "system" && settings.get().voiceEngine !== "system") voiceRuntimeStats.fallbacks++;
   res.status(recorder.recordAudioDelivery(cueId, metric) ? 202 : 404).end();
 });
 async function processFrame(frame: TelemetryFrame): Promise<void> {

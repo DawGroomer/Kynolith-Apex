@@ -13,3 +13,13 @@ test("voice runtime caches rendered phrases and reports the engine", async () =>
   const cached = await runtime.render(request);
   assert.equal(cached.cacheHit, true); assert.equal(cached.engine, "kokoro-q8"); assert.equal(renders, 1);
 });
+
+test("low-memory guard still permits a cached spotter phrase", async () => {
+  let allowed = true;
+  const directory = await mkdtemp(path.join(os.tmpdir(), "apex-voice-guard-"));
+  const runtime = new VoiceRuntime(directory, async () => new Uint8Array([4, 5, 6]).buffer, () => allowed);
+  const request = { text: "Clear right.", voice: "am_fenrir", speed: 1, role: "spotter" as const, emotion: "urgent" as const, phraseKey: "clear-right" };
+  await runtime.render(request); allowed = false;
+  assert.equal((await runtime.render(request)).cacheHit, true);
+  await assert.rejects(() => runtime.render({ ...request, phraseKey: "uncached" }), /Memory guard blocked uncached/);
+});

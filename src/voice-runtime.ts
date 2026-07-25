@@ -8,7 +8,7 @@ export interface VoiceResult { wav: ArrayBuffer; engine: "kokoro-q8"; cacheHit: 
 export class VoiceRuntime {
   private tail: Promise<void> = Promise.resolve();
   private memory = new Map<string, ArrayBuffer>();
-  constructor(private readonly cacheDirectory: string, private readonly synthesize: (request: VoiceRequest) => Promise<ArrayBuffer>) {}
+  constructor(private readonly cacheDirectory: string, private readonly synthesize: (request: VoiceRequest) => Promise<ArrayBuffer>, private readonly canSynthesize: () => boolean = () => true) {}
 
   async render(request: VoiceRequest): Promise<VoiceResult> {
     const key = cacheKey(request);
@@ -17,6 +17,7 @@ export class VoiceRuntime {
     if (memory) return { wav: memory.slice(0), engine: "kokoro-q8", cacheHit: true, queueDelayMs: 0, synthesisMs: 0 };
     const disk = await this.read(key);
     if (disk) { this.memory.set(key, disk); return { wav: disk.slice(0), engine: "kokoro-q8", cacheHit: true, queueDelayMs: 0, synthesisMs: 0 }; }
+    if (!this.canSynthesize()) throw new Error("Memory guard blocked uncached neural speech");
     let release!: () => void;
     const previous = this.tail;
     this.tail = new Promise<void>(resolve => { release = resolve; });
