@@ -2,6 +2,7 @@ import type { CoachingCue, TelemetryFrame } from "./types.js";
 import { CornerCoach } from "./corner-coach.js";
 import { RacecraftPredictor } from "./racecraft-predictor.js";
 import { StrategyCoach } from "./strategy-coach.js";
+import { ShiftCoach } from "./shift-coach.js";
 
 interface Sample { frame: TelemetryFrame; }
 
@@ -19,6 +20,7 @@ export class CoachingEngine {
   private cornerCoach = new CornerCoach();
   private racecraftPredictor = new RacecraftPredictor();
   private strategyCoach = new StrategyCoach();
+  private shiftCoach = new ShiftCoach();
   private leftSeenAt = 0; private rightSeenAt = 0; private leftClearAt = 0; private rightClearAt = 0;
   private leftTransitionAt = 0; private rightTransitionAt = 0;
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
@@ -147,6 +149,7 @@ export class CoachingEngine {
       }
     }
     cues.push(...this.cornerCoach.ingest(frame, this.instructionMode === "active"));
+    cues.push(...this.shiftCoach.ingest(frame));
     if (this.curriculumLevel >= 2) cues.push(...this.racecraftPredictor.ingest(frame));
     if (this.curriculumLevel >= 3) cues.push(...this.strategyCoach.ingest(frame));
 
@@ -155,15 +158,15 @@ export class CoachingEngine {
     if (hottest > 115) this.emit(cues, frame, "hot-tire", 25_000, "race", "tires", "Tire temperature is critical. Back off the sliding and open the corner exits for half a lap.");
     else if (spread > 22) this.emit(cues, frame, "tire-spread", 30_000, "info", "tires", "Large tire temperature split. Build load progressively and avoid scrubbing the cold end.");
     if (this.instructionMode !== "active" && !frame.inPits && frame.speedKph > 45 && frame.timestamp - this.lastGuidanceAt >= this.instructionIntervalMs) {
-      const guidance = this.curriculumLevel === 0
-        ? (frame.brake > .18 ? "Smooth off the brake. Look through the exit." : Math.abs(frame.steering) > .3 ? "Eyes through the corner. One smooth steering input." : "Use the same marker. Smooth on, smooth off.")
+      const [guidanceKey, guidance] = this.curriculumLevel === 0
+        ? (frame.brake > .18 ? ["coach-brake", "Smooth off the brake. Look through the exit."] : Math.abs(frame.steering) > .3 ? ["coach-steering", "Eyes through the corner. One smooth steering input."] : ["coach-marker", "Use the same marker. Smooth on, smooth off."])
         : this.curriculumLevel === 1
-          ? (frame.brake > .18 ? "Release the brake progressively and keep the front loaded." : Math.abs(frame.steering) > .3 ? "Balance steering against throttle. Unwind before adding power." : "Protect minimum speed with one clean release.")
-          : frame.brake > .18 ? "Match the reference release and protect apex speed."
-            : Math.abs(frame.steering) > .3 ? "Hold the reference arc. Minimize scrub."
-            : frame.throttle > .75 ? "Good. Compare that exit against the reference."
-            : "Stay on the session target. Change one reference at a time.";
-      this.emit(cues, frame, "coach-checkin", 18_000, "technique", "lap", guidance);
+          ? (frame.brake > .18 ? ["coach-brake-loaded", "Release the brake progressively and keep the front loaded."] : Math.abs(frame.steering) > .3 ? ["coach-balance", "Balance steering against throttle. Unwind before adding power."] : ["coach-min-speed", "Protect minimum speed with one clean release."])
+          : frame.brake > .18 ? ["coach-reference-brake", "Match the reference release and protect apex speed."]
+            : Math.abs(frame.steering) > .3 ? ["coach-reference-arc", "Hold the reference arc. Minimize scrub."]
+            : frame.throttle > .75 ? ["coach-reference-exit", "Good. Compare that exit against the reference."]
+            : ["coach-session-target", "Stay on the session target. Change one reference at a time."];
+      this.emit(cues, frame, guidanceKey, 18_000, "technique", "lap", guidance);
       this.lastGuidanceAt = frame.timestamp;
     }
     return cues.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));

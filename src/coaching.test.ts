@@ -47,7 +47,7 @@ test("coach checks in during otherwise clean running", () => {
   const engine = new CoachingEngine();
   engine.ingest(simulatedFrame(100_000));
   const cues = engine.ingest(simulatedFrame(120_000));
-  assert.equal(cues.some(cue => cue.id.startsWith("coach-checkin-")), true);
+  assert.equal(cues.some(cue => cue.id.startsWith("coach-")), true);
 });
 
 test("yellow warning resets only after a green frame", () => {

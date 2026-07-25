@@ -182,7 +182,9 @@ internal static class Program
         for (var i = 0; i < count; i++)
         {
             var other = vehicles[i];
-            if (other.mID == player.mID || other.mInPits != 0) continue;
+            // -1 is an inactive scoring slot and 3 is an LMU replay/ghost entry.
+            // Neither represents a live car that the spotter should call.
+            if (other.mID == player.mID || other.mInPits != 0 || other.mControl < 0 || other.mControl == 3) continue;
             var dx = other.mPos.x - player.mPos.x; var dy = other.mPos.y - player.mPos.y; var dz = other.mPos.z - player.mPos.z;
             var localX = dx * player.mOri[0].x + dy * player.mOri[1].x + dz * player.mOri[2].x;
             var localZ = dx * player.mOri[0].z + dy * player.mOri[1].z + dz * player.mOri[2].z;

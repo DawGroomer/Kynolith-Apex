@@ -235,7 +235,7 @@ export interface CoachingCue {
   id: string;
   at: number;
   priority: CoachingPriority;
-  category: "safety" | "braking" | "throttle" | "steering" | "tires" | "racecraft" | "lap";
+  category: "safety" | "braking" | "throttle" | "steering" | "shift" | "tires" | "racecraft" | "lap";
   message: string;
   speak: boolean;
   expiresAt: number;

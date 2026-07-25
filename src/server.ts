@@ -19,6 +19,7 @@ import { MINIMUM_CALIBRATION_LABELS, ScoreCalibrationStore, type ExpertLabel } f
 import { convertReferenceFile } from "./reference-converter.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
 import { VoiceRuntime, type VoiceRequest } from "./voice-runtime.js";
+import { SHIFT_COACH_PHRASES } from "./shift-coach.js";
 
 export interface CoachServerOptions {
   port?: number;
@@ -75,9 +76,37 @@ const spotterWarmup = [
   ["yellow", "Yellow flag! No overtaking. Watch for stopped cars."], ["local-yellow", "Local yellow! No overtaking. Watch for an incident."],
   ["track-edge", "Track limits. Two wheels off. Bring it back inside."], ["impact", "Impact! Hold the brakes. Check traffic, then rejoin safely."]
 ] as const;
+const coachWarmup = [
+  ["coach-brake", "Smooth off the brake. Look through the exit."], ["coach-steering", "Eyes through the corner. One smooth steering input."],
+  ["coach-marker", "Use the same marker. Smooth on, smooth off."], ["coach-brake-loaded", "Release the brake progressively and keep the front loaded."],
+  ["coach-balance", "Balance steering against throttle. Unwind before adding power."], ["coach-min-speed", "Protect minimum speed with one clean release."],
+  ["coach-reference-brake", "Match the reference release and protect apex speed."], ["coach-reference-arc", "Hold the reference arc. Minimize scrub."],
+  ["coach-reference-exit", "Good. Compare that exit against the reference."], ["coach-session-target", "Stay on the session target. Change one reference at a time."],
+  ...Object.entries(SHIFT_COACH_PHRASES)
+] as const;
+let voicePrewarmRunning = false;
+let voicePrewarmReady = false;
+const prewarmVoices = async (config: ReturnType<SettingsStore["get"]>): Promise<void> => {
+  if (voicePrewarmRunning) return;
+  voicePrewarmRunning = true;
+  const spotter = spotterWarmup.map(([phraseKey, text]) => ({ text, phraseKey, voice: config.spotterVoice, speed: config.voiceRate, role: "spotter" as const, emotion: "urgent" as const }));
+  const coach = coachWarmup.flatMap(([phraseKey, base]) => {
+    const tempered = applyTemper(base, config.swearingLevel, phraseKey, false);
+    const emotion = /clean|good|nailed|better/i.test(tempered) ? "positive" as const : "firm" as const;
+    const requests: VoiceRequest[] = [{ text: tempered, voice: config.neuralVoice, speed: config.voiceRate, role: "coach", emotion }];
+    if (config.driverName) requests.push({ text: personalize(tempered, config.driverName), voice: config.neuralVoice, speed: config.voiceRate, role: "coach", emotion });
+    return requests;
+  });
+  try { await voiceRuntime.prewarm([...spotter, ...coach]); voicePrewarmReady = true; }
+  catch { voiceRuntimeStats.failures++; voicePrewarmReady = false; }
+  finally { voicePrewarmRunning = false; }
+};
 if (process.env.KYNOLITH_DESKTOP === "1") {
-  void voiceRuntime.prewarm(spotterWarmup.map(([phraseKey, text]) => ({ text, phraseKey, voice: settings.get().spotterVoice, speed: settings.get().voiceRate, role: "spotter", emotion: "urgent" }))).catch(() => { voiceRuntimeStats.failures++; });
+  void prewarmVoices(settings.get());
 }
+const voicePrewarmTimer = setInterval(() => {
+  if (process.env.KYNOLITH_DESKTOP === "1" && !voicePrewarmReady && !state.sessionActive && os.freemem() >= 2.5 * 1024 ** 3) void prewarmVoices(settings.get());
+}, 15_000);
 const acceptTelemetry = (frame: TelemetryFrame): boolean => { state.connected = true; state.source = "lmu"; return telemetryPipeline.push(frame); };
 
 app.use(express.json({ limit: "25mb" }));
@@ -91,7 +120,7 @@ app.put("/api/settings", async (req, res) => {
     scheduler.setMinimumSpacing(spacingFor(next.speechFrequency));
     scheduler.setTechniquePolicy(next.speechFrequency);
     engine.setInstructionMode(next.speechFrequency);
-    if (process.env.KYNOLITH_DESKTOP === "1") void voiceRuntime.prewarm(spotterWarmup.map(([phraseKey, text]) => ({ text, phraseKey, voice: next.spotterVoice, speed: next.voiceRate, role: "spotter", emotion: "urgent" }))).catch(() => { voiceRuntimeStats.failures++; });
+    if (process.env.KYNOLITH_DESKTOP === "1") { voicePrewarmReady = false; void prewarmVoices(next); }
     res.json(next);
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid settings" }); }
 });
@@ -254,8 +283,9 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
       else if (level === 3) lastStrongLanguageAt = frame.timestamp;
       const cornerCall = cue.id.startsWith("corner-review") || cue.id.startsWith("corner-clean");
       const positive = cue.id.startsWith("corner-clean") || cue.id.startsWith("clean-exit");
-      if (cornerCall && level === 4) cue.message = applyRowdyCorner(cue.message, positive, cue.id);
-      else if (!cornerCall) cue.message = applyTemper(cue.message, level, cue.id, positive);
+      const personalitySeed = cue.id.replace(/-\d+$/, "");
+      if (cornerCall && level === 4) cue.message = applyRowdyCorner(cue.message, positive, personalitySeed);
+      else if (!cornerCall) cue.message = applyTemper(cue.message, level, personalitySeed, positive);
     }
     if (config.driverName && cue.priority === "technique" && shouldUseName(cue.id, frame.lap)) cue.message = personalize(cue.message, config.driverName);
     cue.speak = state.source === "lmu" && config.autoSpeak && allowedToSpeak(cue, config);
@@ -331,6 +361,7 @@ return {
   disconnectTelemetry: async () => { await telemetryPipeline.idle(); state.connected = false; state.source = "simulator"; state.sessionActive = false; await recorder.finish(); },
   close: async () => {
     clearInterval(simulatorTimer);
+    clearInterval(voicePrewarmTimer);
     await recorder.finish();
     await localAi.dispose();
     for (const socket of wss.clients) socket.close();
