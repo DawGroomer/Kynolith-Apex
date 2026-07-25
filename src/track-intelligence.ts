@@ -35,7 +35,8 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
     const list = perLap.get(frame.lap) ?? []; list.push(frame); perLap.set(frame.lap, list);
   }
   const sessionReferenceFrames = referenceLap == null ? [] : perLap.get(referenceLap) ?? [];
-  const activeReference = expert?.frames.length ? { source: "expert" as const, label: expert.name, lapTimeSeconds: expert.lapTimeSeconds, frames: expert.frames }
+  const activeReference = expert?.frames.length ? { source: expert.benchmark ? "community-benchmark" as const : "expert" as const, label: expert.name, lapTimeSeconds: expert.lapTimeSeconds, frames: expert.frames,
+    ...(expert.benchmark ? { confidenceRangeSeconds: expert.benchmark.targetLapRangeSeconds } : {}) }
     : personalBest?.frames.length ? { source: "personal-best" as const, ...personalBest }
       : sessionReferenceFrames.length ? { source: "session" as const, label: `Lap ${referenceLap}`, lapTimeSeconds: completeLaps.find(lap => lap.lap === referenceLap)?.durationSeconds ?? null, frames: sessionReferenceFrames } : null;
   const referenceFrames = activeReference?.frames ?? [];
@@ -69,7 +70,8 @@ export function analyzeSessionIntelligence(session: RecordedSession, personalBes
   const racecraft = { multiclassEncounters: countMulticlassEncounters(relevantFrames),
     predictiveWarnings: session.cues.filter(entry => entry.cue.id.startsWith("multiclass-")).length };
   return { model, referenceLap,
-    reference: activeReference ? { source: activeReference.source, label: activeReference.label, lapTimeSeconds: activeReference.lapTimeSeconds } : null,
+    reference: activeReference ? { source: activeReference.source, label: activeReference.label, lapTimeSeconds: activeReference.lapTimeSeconds,
+      ...("confidenceRangeSeconds" in activeReference ? { confidenceRangeSeconds: activeReference.confidenceRangeSeconds } : {}) } : null,
     personalBestSeconds: personalBest?.lapTimeSeconds ?? completeLaps[0]?.durationSeconds ?? null,
     theoreticalBestSeconds: theoreticalBest(completeLaps.map(lap => perLap.get(lap.lap) ?? [])),
     sessionObjective: objective(lowest), skills, corners, racecraft, setupFindings: setupFindings(relevantFrames, completeLaps.length, session.summary.consistencySeconds),

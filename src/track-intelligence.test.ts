@@ -32,6 +32,19 @@ test("expert reference takes priority without replacing personal best", () => {
   assert.equal(result.personalBestSeconds, 99);
 });
 
+test("labels a MyLMU target as a community benchmark with its confidence range", () => {
+  const frames = Array.from({ length: 101 }, (_, i) => ({ ...simulatedFrame(500_000 + i * 1_000), track: "Fuji Speedway", vehicle: "test", lap: 1, lapDistance: i / 100 }));
+  const session: RecordedSession = { summary: { id: "session-community", startedAt: 1, endedAt: 2, track: "Fuji Speedway", vehicle: "test", session: "practice",
+    laps: [{ lap: 1, durationSeconds: 100, maxSpeedMph: 100, averageSpeedMph: 80, brakingSmoothness: 90, throttleSmoothness: 90, complete: true }],
+    fastestLapSeconds: 100, consistencySeconds: null, maxSpeedMph: 100, coachCueCount: 0, primaryFocus: "test" }, frames, cues: [] };
+  const benchmark = { id: "reference-community", name: "MyLMU Community Benchmark", track: "Fuji Speedway", vehicle: "test", importedAt: 1, lapTimeSeconds: 95, frames,
+    benchmark: { type: "mylmu-community-benchmark" as const, label: "MyLMU Community Benchmark" as const, driver: "Community driver", sourceUrl: "https://mylmu.app", observedAt: "2026-07-25",
+      geometrySource: "driver-owned-lmu-duckdb" as const, geometryLapSeconds: 100, targetLapSeconds: 95, targetLapRangeSeconds: [94.9, 95.1] as [number, number], sectors: [], targets: [], warnings: [] } };
+  const result = analyzeSessionIntelligence(session, null, benchmark);
+  assert.equal(result.reference?.source, "community-benchmark");
+  assert.deepEqual(result.reference?.confidenceRangeSeconds, [94.9, 95.1]);
+});
+
 test("distance interpolation removes sample-boundary timing error and reports uncertainty", () => {
   const frames = Array.from({ length: 11 }, (_, index) => ({ ...simulatedFrame(1_000 + index * 100), lapDistance: index / 10 }));
   const window = interpolatedWindow(frames, .15, .85);

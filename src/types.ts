@@ -168,7 +168,7 @@ export interface CornerPerformance {
 export interface SessionIntelligence {
   model: TrackModel | null;
   referenceLap: number | null;
-  reference: { source: "personal-best" | "expert" | "session"; label: string; lapTimeSeconds: number | null } | null;
+  reference: { source: "personal-best" | "expert" | "community-benchmark" | "session"; label: string; lapTimeSeconds: number | null; confidenceRangeSeconds?: [number, number] } | null;
   personalBestSeconds: number | null;
   theoreticalBestSeconds: number | null;
   sessionObjective: string;
@@ -221,13 +221,35 @@ export interface DrivingReference {
   importedAt: number;
   lapTimeSeconds: number | null;
   provenance?: {
-    format: "apex-json" | "lmu-duckdb" | "csv" | "motec-csv";
+    format: "apex-json" | "lmu-duckdb" | "csv" | "motec-csv" | "mylmu-community-benchmark";
     sourceFile: string;
     driver?: string;
     channels: string[];
     warnings: string[];
   };
+  benchmark?: CommunityBenchmarkMetadata;
   frames: TelemetryFrame[];
+}
+
+export interface CommunityBenchmarkMetadata {
+  type: "mylmu-community-benchmark";
+  label: "MyLMU Community Benchmark";
+  driver: string;
+  sourceUrl: string;
+  observedAt: string;
+  geometrySource: "driver-owned-lmu-duckdb";
+  geometryLapSeconds: number;
+  targetLapSeconds: number;
+  targetLapRangeSeconds: [number, number];
+  sectors: Array<{ sector: 1 | 2 | 3; seconds: number; rangeSeconds: [number, number] }>;
+  targets: Array<{
+    cornerId: string;
+    confidence: "low" | "moderate";
+    brakeShiftMeters?: { midpoint: number; range: [number, number] };
+    minimumSpeedGainKph?: { midpoint: number; range: [number, number] };
+    fullThrottleShiftMeters?: { midpoint: number; range: [number, number] };
+  }>;
+  warnings: string[];
 }
 
 export type CoachingPriority = "critical" | "race" | "technique" | "info";

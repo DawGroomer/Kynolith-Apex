@@ -35,7 +35,10 @@ export class ReferenceStore {
     const lapTimeSeconds = lapFrames.length > 1 ? (lapFrames.at(-1)!.timestamp - lapFrames[0]!.timestamp) / 1000 : null;
     const importedAt = Date.now(), id = `reference-${importedAt.toString(36)}`;
     const provenance = source.provenance && typeof source.provenance === "object" ? source.provenance : undefined;
-    const reference: DrivingReference = { id, name: String(source.name ?? `Expert ${track}`).trim().slice(0, 80), track, vehicle, importedAt, lapTimeSeconds, frames: lapFrames, ...(provenance ? { provenance } : {}) };
+    const benchmark = source.benchmark?.type === "mylmu-community-benchmark" ? source.benchmark : undefined;
+    const effectiveLapTime = benchmark?.targetLapSeconds ?? lapTimeSeconds;
+    const reference: DrivingReference = { id, name: String(source.name ?? `Expert ${track}`).trim().slice(0, 120), track, vehicle, importedAt, lapTimeSeconds: effectiveLapTime, frames: lapFrames,
+      ...(provenance ? { provenance } : {}), ...(benchmark ? { benchmark } : {}) };
     await this.initialize();
     await writeFile(path.join(this.directory, `${id}.json`), JSON.stringify(reference), "utf8");
     const { frames: _frames, ...summary } = reference;

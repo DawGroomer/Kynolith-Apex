@@ -16,6 +16,7 @@
     "test:local-ai": "tsx scripts/test-local-ai.ts",
     "test:local-voice": "tsx scripts/test-local-voice.ts",
     "reference:convert": "tsx scripts/convert-reference.ts",
+    "benchmark:mylmu": "tsx scripts/build-mylmu-benchmark.ts",
     "data:quality": "tsx scripts/migrate-session-quality.ts",
     "models:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stage-offline-models.ps1",
     "typecheck": "tsc --noEmit",
