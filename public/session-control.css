@@ -1,0 +1,26 @@
+.coach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.coach button.stop-session {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+
+.coach button.stop-session:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.coach button.stop-session:not(:disabled):hover {
+  background: var(--red);
+  color: white;
+}
+
+#sessionControlState {
+  color: var(--muted);
+}

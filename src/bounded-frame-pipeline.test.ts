@@ -24,3 +24,16 @@ test("pipeline remains bounded and retains fresh frames under pressure", async (
   assert.equal(seen.at(-1), 20);
   assert.ok(seen.length <= 4);
 });
+
+test("pipeline discards frames that cannot meet the 200 millisecond live deadline", async () => {
+  const seen: number[] = [];
+  const pipeline = new BoundedFramePipeline<{ timestamp: number }>(8, async frame => {
+    seen.push(frame.timestamp);
+    if (frame.timestamp === 1) await new Promise(resolve => setTimeout(resolve, 210));
+  }, 180);
+  pipeline.push({ timestamp: 1 });
+  pipeline.push({ timestamp: 2 });
+  await pipeline.idle();
+  assert.deepEqual(seen, [1]);
+  assert.equal(pipeline.snapshot().dropped, 1);
+});

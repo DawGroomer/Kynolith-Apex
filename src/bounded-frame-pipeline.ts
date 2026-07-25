@@ -17,8 +17,9 @@ export class BoundedFramePipeline<T extends { timestamp: number }> {
   private idleWaiters: Array<() => void> = [];
   private metrics: PipelineMetrics = { accepted: 0, processed: 0, dropped: 0, outOfOrder: 0, queued: 0, processing: false, lastLatencyMs: 0, maxLatencyMs: 0 };
 
-  constructor(private readonly capacity: number, private readonly consume: (value: T) => Promise<void>) {
+  constructor(private readonly capacity: number, private readonly consume: (value: T) => Promise<void>, private readonly maximumQueueAgeMs = Infinity) {
     if (!Number.isInteger(capacity) || capacity < 2) throw new Error("Pipeline capacity must be at least two frames");
+    if (maximumQueueAgeMs <= 0) throw new Error("Maximum queue age must be positive");
   }
 
   push(value: T): boolean {
@@ -50,6 +51,7 @@ export class BoundedFramePipeline<T extends { timestamp: number }> {
     try {
       while (this.queue.length) {
         const item = this.queue.shift()!; this.metrics.queued = this.queue.length;
+        if (Date.now() - item.acceptedAt > this.maximumQueueAgeMs) { this.metrics.dropped++; continue; }
         if (item.value.timestamp <= this.lastTimestamp) { this.metrics.outOfOrder++; continue; }
         this.lastTimestamp = item.value.timestamp;
         await this.consume(item.value);

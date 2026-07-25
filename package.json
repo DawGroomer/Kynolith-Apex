@@ -1,7 +1,7 @@
 {
   "name": "kynolith-lmu-coach",
   "productName": "Kynolith Apex LMU Coach",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Real-time Le Mans Ultimate driving coach with live telemetry and conversational voice.",
   "author": "Kynolith LLC",
   "private": true,

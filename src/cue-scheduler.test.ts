@@ -26,3 +26,17 @@ test("new technique call replaces stale technique advice", () => {
   scheduler.enqueue([cue({ id: "new", at: 11_000, message: "Smoother release" })]);
   assert.equal(scheduler.next({ ...simulatedFrame(12_000), brake: 0, lateralG: 0, steering: 0 })?.id, "new");
 });
+
+test("active coaching permits no more than three spaced technique calls per lap", () => {
+  const scheduler = new CueScheduler(); scheduler.setTechniquePolicy("active");
+  const spoken: string[] = [];
+  for (let index = 0; index < 8; index++) {
+    const timestamp = 100_000 + index * 21_000;
+    scheduler.enqueue([cue({ id: `technique-${index}`, at: timestamp, expiresAt: timestamp + 5_000 })]);
+    const next = scheduler.next({ ...simulatedFrame(timestamp), timestamp, lap: 2, brake: 0, lateralG: 0, steering: 0 });
+    if (next) spoken.push(next.id);
+  }
+  assert.equal(spoken.length, 3);
+  scheduler.enqueue([cue({ id: "next-lap", at: 300_000, expiresAt: 305_000 })]);
+  assert.equal(scheduler.next({ ...simulatedFrame(300_000), timestamp: 300_000, lap: 3, brake: 0, lateralG: 0, steering: 0 })?.id, "next-lap");
+});

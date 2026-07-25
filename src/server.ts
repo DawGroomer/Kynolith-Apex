@@ -53,16 +53,21 @@ await settings.initialize();
 const calibration = new ScoreCalibrationStore(path.join(dataDir, "score-calibration.json"));
 await calibration.initialize();
 scheduler.setMinimumSpacing(spacingFor(settings.get().speechFrequency));
+scheduler.setTechniquePolicy(settings.get().speechFrequency);
 engine.setInstructionMode(settings.get().speechFrequency);
 const localAi = new LocalAi(path.join(dataDir, "models"), {
   ...(options.bundledModelsDir ? { bundledModelsDirectory: options.bundledModelsDir } : {}),
   ...(options.allowModelDownloads === undefined ? {} : { allowModelDownloads: options.allowModelDownloads })
 });
 let welcomedSessionKey = "";
+let terminalSession = false;
+let manuallyStoppedSessionKey = "";
+let manualStopSawTerminal = false;
 let neuralSpeechBusy = false;
 let lastStrongLanguageAt = 0;
-const state: CoachState = { connected: false, source: "simulator", frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
-const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(256, processFrame);
+let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
+const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
+const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(12, processFrame, 180);
 const acceptTelemetry = (frame: TelemetryFrame): boolean => { state.connected = true; state.source = "lmu"; return telemetryPipeline.push(frame); };
 
 app.use(express.json({ limit: "25mb" }));
@@ -74,6 +79,7 @@ app.put("/api/settings", async (req, res) => {
   try {
     const next = await settings.update(req.body ?? {});
     scheduler.setMinimumSpacing(spacingFor(next.speechFrequency));
+    scheduler.setTechniquePolicy(next.speechFrequency);
     engine.setInstructionMode(next.speechFrequency);
     res.json(next);
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid settings" }); }
@@ -98,8 +104,19 @@ app.post("/api/telemetry/disconnect", async (_req, res) => {
   await telemetryPipeline.idle();
   state.connected = false;
   state.source = "simulator";
+  state.sessionActive = false;
   await recorder.finish();
   res.sendStatus(204);
+});
+app.post("/api/session/stop", async (_req, res) => {
+  await telemetryPipeline.idle();
+  const frame = state.frame;
+  manuallyStoppedSessionKey = frame ? sessionKeyFor(frame) : "manual-stop";
+  manualStopSawTerminal = false;
+  state.sessionActive = false;
+  scheduler.clear();
+  const summary = await recorder.finish();
+  res.json({ stopped: true, summary });
 });
 app.get("/api/sessions", async (_req, res) => res.json(await recorder.list()));
 app.get("/api/profile", async (_req, res) => res.json(buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get())));
@@ -165,16 +182,29 @@ app.post("/api/local/speak", async (req, res) => {
 });
 async function processFrame(frame: TelemetryFrame): Promise<void> {
   state.frame = frame;
+  const sessionKey = sessionKeyFor(frame);
+  const sessionTerminal = (frame.gamePhase ?? 0) >= 8 || (frame.sessionTimeRemainingSeconds === 0 && frame.inPits);
+  if (state.source === "lmu" && sessionTerminal) {
+    state.sessionActive = false;
+    if (manuallyStoppedSessionKey) manualStopSawTerminal = true;
+    if (!terminalSession) { terminalSession = true; scheduler.clear(); await recorder.finish(); welcomedSessionKey = ""; }
+    broadcast(null);
+    return;
+  }
+  const supportedSession = frame.session === "practice" || frame.session === "qualifying" || frame.session === "race";
+  const shouldRearm = Boolean(manuallyStoppedSessionKey) && supportedSession && (sessionKey !== manuallyStoppedSessionKey || manualStopSawTerminal);
+  if (shouldRearm) { manuallyStoppedSessionKey = ""; manualStopSawTerminal = false; }
+  if (terminalSession) { terminalSession = false; cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy; }
+  if (!supportedSession || manuallyStoppedSessionKey) { state.sessionActive = false; broadcast(null); return; }
+  state.sessionActive = state.source === "lmu";
   if (state.source === "lmu") await recorder.recordFrame(frame);
-  const sessionKey = `${frame.track}|${frame.vehicle}|${frame.session}`;
   if (state.source === "lmu" && sessionKey !== welcomedSessionKey) {
     welcomedSessionKey = sessionKey;
     const name = settings.get().driverName;
-    const academy = buildDriverProfile(name, await recorder.list(), calibration.get()).academy;
-    engine.setCurriculumLevel(academy.curriculumLevel);
+    engine.setCurriculumLevel(cachedAcademy.curriculumLevel);
     scheduler.enqueue([{
       id: `welcome-${frame.timestamp}`, at: frame.timestamp, priority: "info", category: "lap",
-      message: name ? `${name}, today's drill: ${academy.drill.name}. Build into it.` : `Today's drill: ${academy.drill.name}. Build into it.`,
+      message: name ? `${name}, today's drill: ${cachedAcademy.drill.name}. Build into it.` : `Today's drill: ${cachedAcademy.drill.name}. Build into it.`,
       speak: true, expiresAt: frame.timestamp + 15_000, delayInHardPart: true
     }]);
   }
@@ -195,9 +225,15 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
     cue.speak = state.source === "lmu" && config.autoSpeak && allowedToSpeak(cue, config);
     state.lastCue = cue; if (state.source === "lmu") recorder.recordCue(cue, frame);
   }
-  const payload = JSON.stringify({ type: "state", state, cue: cue ?? null });
+  broadcast(cue ?? null);
+}
+
+function broadcast(cue: import("./types.js").CoachingCue | null): void {
+  const payload = JSON.stringify({ type: "state", state, cue });
   for (const client of wss.clients) if (client.readyState === 1) client.send(payload);
 }
+
+function sessionKeyFor(frame: TelemetryFrame): string { return `${frame.track}|${frame.vehicle}|${frame.session}`; }
 
 function allowedToSpeak(cue: { priority: string; category: string }, config: ReturnType<SettingsStore["get"]>): boolean {
   if (cue.category === "safety") return config.speakSafety;
@@ -255,7 +291,7 @@ return {
   port: address.port,
   ingestTelemetry: acceptTelemetry,
   telemetryMetrics: () => telemetryPipeline.snapshot(),
-  disconnectTelemetry: async () => { await telemetryPipeline.idle(); state.connected = false; state.source = "simulator"; await recorder.finish(); },
+  disconnectTelemetry: async () => { await telemetryPipeline.idle(); state.connected = false; state.source = "simulator"; state.sessionActive = false; await recorder.finish(); },
   close: async () => {
     clearInterval(simulatorTimer);
     await recorder.finish();

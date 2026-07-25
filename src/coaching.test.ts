@@ -20,13 +20,26 @@ test("cooldown suppresses repeated yellow calls", () => {
 test("spotter calls a car alongside and then clear", () => {
   const engine = new CoachingEngine();
   engine.ingest({ ...simulatedFrame(100_000), carLeft: true });
-  engine.ingest({ ...simulatedFrame(100_050), carLeft: true });
-  const left = engine.ingest({ ...simulatedFrame(100_100), carLeft: true });
+  engine.ingest({ ...simulatedFrame(100_100), carLeft: true });
+  const left = engine.ingest({ ...simulatedFrame(100_150), carLeft: true });
   assert.equal(left.some(cue => cue.message.startsWith("Car left")), true);
   assert.equal(engine.ingest({ ...simulatedFrame(101_000), carLeft: true }).some(cue => cue.message.startsWith("Car left")), false);
-  for (let i = 0; i < 11; i++) engine.ingest({ ...simulatedFrame(102_000 + i * 50), carLeft: false });
-  const clear = engine.ingest({ ...simulatedFrame(102_550), carLeft: false });
+  engine.ingest({ ...simulatedFrame(102_000), carLeft: false });
+  engine.ingest({ ...simulatedFrame(102_400), carLeft: false });
+  const clear = engine.ingest({ ...simulatedFrame(102_500), carLeft: false });
   assert.equal(clear.some(cue => cue.message === "Clear left."), true);
+});
+
+test("spotter ignores brief overlap and clear noise", () => {
+  const engine = new CoachingEngine();
+  const noisyEntry = [0, 60, 120].flatMap((offset, index) => engine.ingest({ ...simulatedFrame(200_000 + offset), carRight: index < 2 }));
+  assert.equal(noisyEntry.some(cue => cue.id.startsWith("car-right-")), false);
+  engine.ingest({ ...simulatedFrame(201_000), carRight: true });
+  const entry = engine.ingest({ ...simulatedFrame(201_150), carRight: true });
+  assert.equal(entry.some(cue => cue.id.startsWith("car-right-")), true);
+  engine.ingest({ ...simulatedFrame(201_300), carRight: false });
+  const noise = engine.ingest({ ...simulatedFrame(201_650), carRight: true });
+  assert.equal(noise.some(cue => cue.id.startsWith("clear-right-")), false);
 });
 
 test("coach checks in during otherwise clean running", () => {

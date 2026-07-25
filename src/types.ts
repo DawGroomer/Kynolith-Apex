@@ -227,6 +227,7 @@ export interface CoachingCue {
 export interface CoachState {
   connected: boolean;
   source: "lmu" | "simulator";
+  sessionActive?: boolean;
   frame: TelemetryFrame | null;
   lastCue: CoachingCue | null;
   bestLapSeconds: number | null;

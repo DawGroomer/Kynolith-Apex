@@ -19,7 +19,8 @@ export class CoachingEngine {
   private cornerCoach = new CornerCoach();
   private racecraftPredictor = new RacecraftPredictor();
   private strategyCoach = new StrategyCoach();
-  private leftSeen = 0; private rightSeen = 0; private leftClear = 0; private rightClear = 0;
+  private leftSeenAt = 0; private rightSeenAt = 0; private leftClearAt = 0; private rightClearAt = 0;
+  private leftTransitionAt = 0; private rightTransitionAt = 0;
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
   private lastImpactTimestamp = 0; private impactInitialized = false; private spinSeen = 0; private spinClear = 0; private spinActive = false; private lastIncidentAt = 0;
   private blueActive = false; private sectorYellowActive = false; private damageActive = false; private overheatingActive = false;
@@ -56,12 +57,32 @@ export class CoachingEngine {
     if (nextRainBand > this.rainBand) this.emit(cues, frame, "rain-increase", 20_000, "race", "tires", nextRainBand === 2 ? "Rain increasing. Expect standing water and a longer braking distance." : "Rain beginning. Check grip before committing to the next braking zone.");
     else if (nextRainBand < this.rainBand) this.emit(cues, frame, "rain-ease", 20_000, "info", "tires", "Rain easing. Grip may recover unevenly; stay off painted lines.");
     this.rainBand = nextRainBand;
-    this.leftSeen = frame.carLeft ? this.leftSeen + 1 : 0; this.rightSeen = frame.carRight ? this.rightSeen + 1 : 0;
-    this.leftClear = frame.carLeft ? 0 : this.leftClear + 1; this.rightClear = frame.carRight ? 0 : this.rightClear + 1;
-    if (this.leftSeen === 3 && !this.carLeftActive) { this.carLeftActive = true; this.emit(cues, frame, "car-left", 3_000, "critical", "racecraft", "Car left. Hold your line."); }
-    if (this.rightSeen === 3 && !this.carRightActive) { this.carRightActive = true; this.emit(cues, frame, "car-right", 3_000, "critical", "racecraft", "Car right. Hold your line."); }
-    if (this.leftClear === 12 && this.carLeftActive) { this.carLeftActive = false; this.emit(cues, frame, "clear-left", 3_000, "critical", "racecraft", "Clear left."); }
-    if (this.rightClear === 12 && this.carRightActive) { this.carRightActive = false; this.emit(cues, frame, "clear-right", 3_000, "critical", "racecraft", "Clear right."); }
+    if (frame.carLeft) {
+      this.leftClearAt = 0;
+      if (!this.carLeftActive && !this.leftSeenAt) this.leftSeenAt = frame.timestamp;
+      if (!this.carLeftActive && frame.timestamp - this.leftSeenAt >= 150 && frame.timestamp - this.leftTransitionAt >= 750) {
+        this.carLeftActive = true; this.leftTransitionAt = frame.timestamp; this.emit(cues, frame, "car-left", 0, "critical", "racecraft", "Car left. Hold your line.");
+      }
+    } else {
+      this.leftSeenAt = 0;
+      if (this.carLeftActive && !this.leftClearAt) this.leftClearAt = frame.timestamp;
+      if (this.carLeftActive && frame.timestamp - this.leftClearAt >= 500) {
+        this.carLeftActive = false; this.leftTransitionAt = frame.timestamp; this.leftClearAt = 0; this.emit(cues, frame, "clear-left", 0, "critical", "racecraft", "Clear left.");
+      }
+    }
+    if (frame.carRight) {
+      this.rightClearAt = 0;
+      if (!this.carRightActive && !this.rightSeenAt) this.rightSeenAt = frame.timestamp;
+      if (!this.carRightActive && frame.timestamp - this.rightSeenAt >= 150 && frame.timestamp - this.rightTransitionAt >= 750) {
+        this.carRightActive = true; this.rightTransitionAt = frame.timestamp; this.emit(cues, frame, "car-right", 0, "critical", "racecraft", "Car right. Hold your line.");
+      }
+    } else {
+      this.rightSeenAt = 0;
+      if (this.carRightActive && !this.rightClearAt) this.rightClearAt = frame.timestamp;
+      if (this.carRightActive && frame.timestamp - this.rightClearAt >= 500) {
+        this.carRightActive = false; this.rightTransitionAt = frame.timestamp; this.rightClearAt = 0; this.emit(cues, frame, "clear-right", 0, "critical", "racecraft", "Clear right.");
+      }
+    }
     const newImpact = this.impactInitialized && (frame.impactTimestamp ?? 0) > this.lastImpactTimestamp && (frame.impactMagnitude ?? 0) >= 3;
     this.lastImpactTimestamp = Math.max(this.lastImpactTimestamp, frame.impactTimestamp ?? 0);
     this.impactInitialized = true;
