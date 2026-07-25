@@ -71,7 +71,8 @@ export class CoachingEngine {
     if (nextRainBand > this.rainBand) this.emit(cues, frame, "rain-increase", 20_000, "race", "tires", nextRainBand === 2 ? "Rain increasing. Expect standing water and a longer braking distance." : "Rain beginning. Check grip before committing to the next braking zone.");
     else if (nextRainBand < this.rainBand) this.emit(cues, frame, "rain-ease", 20_000, "info", "tires", "Rain easing. Grip may recover unevenly; stay off painted lines.");
     this.rainBand = nextRainBand;
-    if (frame.carLeft) {
+    const liveOverlap = frame.speedKph >= 15 && !frame.inPits;
+    if (frame.carLeft && liveOverlap) {
       this.leftClearAt = 0;
       if (!this.carLeftActive && !this.leftSeenAt) this.leftSeenAt = frame.timestamp;
       if (!this.carLeftActive && frame.timestamp - this.leftSeenAt >= 150 && frame.timestamp - this.leftTransitionAt >= 750) {
@@ -84,7 +85,7 @@ export class CoachingEngine {
         this.carLeftActive = false; this.leftTransitionAt = frame.timestamp; this.leftClearAt = 0; this.emit(cues, frame, "clear-left", 0, "critical", "racecraft", "Clear left.");
       }
     }
-    if (frame.carRight) {
+    if (frame.carRight && liveOverlap) {
       this.rightClearAt = 0;
       if (!this.carRightActive && !this.rightSeenAt) this.rightSeenAt = frame.timestamp;
       if (!this.carRightActive && frame.timestamp - this.rightSeenAt >= 150 && frame.timestamp - this.rightTransitionAt >= 750) {
@@ -178,7 +179,7 @@ export class CoachingEngine {
     this.cooldown.set(key, frame.timestamp);
     out.push({
       id: `${key}-${frame.timestamp}`, at: frame.timestamp, priority, category, message, speak: true,
-      expiresAt: frame.timestamp + (priority === "critical" ? 2_500 : 8_000),
+      expiresAt: frame.timestamp + (priority === "critical" ? 2_500 : priority === "technique" ? 3_500 : 8_000),
       delayInHardPart: priority !== "critical" && category !== "racecraft"
     });
   }

@@ -27,6 +27,7 @@ export interface CoachServerOptions {
   dataDir?: string;
   bundledModelsDir?: string;
   allowModelDownloads?: boolean;
+  prewarmVoices?: boolean;
 }
 
 export interface RunningCoachServer {
@@ -71,10 +72,12 @@ const state: CoachState = { connected: false, source: "simulator", sessionActive
 const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(12, processFrame, 180);
 const voiceRuntime = new VoiceRuntime(path.join(dataDir, "voice-cache"), request => localAi.synthesize(request.text, request.voice, request.speed, request.role, request.emotion), () => os.freemem() >= 2 * 1024 ** 3);
 const voiceRuntimeStats = { requests: 0, cacheHits: 0, failures: 0, fallbacks: 0, cancellations: 0, drops: 0, lastEngine: "none", lastVoice: "none", lastSynthesisMs: 0, lastQueueDelayMs: 0 };
+const voicePrewarmEnabled = process.env.KYNOLITH_DESKTOP === "1" && options.prewarmVoices !== false;
 const spotterWarmup = [
   ["car-left", "Car left. Hold your line."], ["car-right", "Car right. Hold your line."], ["clear-left", "Clear left."], ["clear-right", "Clear right."],
   ["yellow", "Yellow flag! No overtaking. Watch for stopped cars."], ["local-yellow", "Local yellow! No overtaking. Watch for an incident."],
-  ["track-edge", "Track limits. Two wheels off. Bring it back inside."], ["impact", "Impact! Hold the brakes. Check traffic, then rejoin safely."]
+  ["track-edge", "Track limits. Two wheels off. Bring it back inside."], ["impact", "Impact! Hold the brakes. Check traffic, then rejoin safely."],
+  ["spin", "Spin! Hold the brakes. Stabilize the car, then rejoin safely."]
 ] as const;
 const coachWarmup = [
   ["coach-brake", "Smooth off the brake. Look through the exit."], ["coach-steering", "Eyes through the corner. One smooth steering input."],
@@ -82,6 +85,7 @@ const coachWarmup = [
   ["coach-balance", "Balance steering against throttle. Unwind before adding power."], ["coach-min-speed", "Protect minimum speed with one clean release."],
   ["coach-reference-brake", "Match the reference release and protect apex speed."], ["coach-reference-arc", "Hold the reference arc. Minimize scrub."],
   ["coach-reference-exit", "Good. Compare that exit against the reference."], ["coach-session-target", "Stay on the session target. Change one reference at a time."],
+  ["tc-active", "Traction control is working. Unwind the wheel before adding more throttle."],
   ...Object.entries(SHIFT_COACH_PHRASES)
 ] as const;
 let voicePrewarmRunning = false;
@@ -97,16 +101,18 @@ const prewarmVoices = async (config: ReturnType<SettingsStore["get"]>): Promise<
     if (config.driverName) requests.push({ text: personalize(tempered, config.driverName), voice: config.neuralVoice, speed: config.voiceRate, role: "coach", emotion });
     return requests;
   });
-  try { await voiceRuntime.prewarm([...spotter, ...coach]); voicePrewarmReady = true; }
+  const laps: VoiceRequest[] = Array.from({ length: 20 }, (_, index) => ({ text: `Lap ${index + 1}. Build it.`, voice: config.neuralVoice, speed: config.voiceRate, role: "coach", emotion: "calm" }));
+  try { await voiceRuntime.prewarm([...spotter, ...coach, ...laps]); voicePrewarmReady = true; }
   catch { voiceRuntimeStats.failures++; voicePrewarmReady = false; }
   finally { voicePrewarmRunning = false; }
 };
-if (process.env.KYNOLITH_DESKTOP === "1") {
+if (voicePrewarmEnabled) {
   void prewarmVoices(settings.get());
 }
 const voicePrewarmTimer = setInterval(() => {
-  if (process.env.KYNOLITH_DESKTOP === "1" && !voicePrewarmReady && !state.sessionActive && os.freemem() >= 2.5 * 1024 ** 3) void prewarmVoices(settings.get());
+  if (voicePrewarmEnabled && !voicePrewarmReady && !state.sessionActive && os.freemem() >= 2.5 * 1024 ** 3) void prewarmVoices(settings.get());
 }, 15_000);
+voicePrewarmTimer.unref();
 const acceptTelemetry = (frame: TelemetryFrame): boolean => { state.connected = true; state.source = "lmu"; return telemetryPipeline.push(frame); };
 
 app.use(express.json({ limit: "25mb" }));
@@ -120,7 +126,7 @@ app.put("/api/settings", async (req, res) => {
     scheduler.setMinimumSpacing(spacingFor(next.speechFrequency));
     scheduler.setTechniquePolicy(next.speechFrequency);
     engine.setInstructionMode(next.speechFrequency);
-    if (process.env.KYNOLITH_DESKTOP === "1") { voicePrewarmReady = false; void prewarmVoices(next); }
+    if (voicePrewarmEnabled) { voicePrewarmReady = false; void prewarmVoices(next); }
     res.json(next);
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid settings" }); }
 });

@@ -9,7 +9,7 @@ test("desktop server records LMU frames and exposes session review", async () =>
   process.env.KYNOLITH_DESKTOP = "1";
   const { startCoachServer } = await import("./server.js");
   const dataDir = await mkdtemp(path.join(os.tmpdir(), "apex-server-"));
-  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir });
+  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir, prewarmVoices: false });
   const base = `http://127.0.0.1:${running.port}`;
   try {
     for (let i = 0; i < 220; i++) {
@@ -31,7 +31,7 @@ test("LMU terminal game phase finalizes the session without a disconnect", async
   process.env.KYNOLITH_DESKTOP = "1";
   const { startCoachServer } = await import("./server.js");
   const dataDir = await mkdtemp(path.join(os.tmpdir(), "apex-terminal-"));
-  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir });
+  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir, prewarmVoices: false });
   try {
     for (let index = 0; index < 900; index++) {
       const timestamp = 2_000_000 + index * 125;
@@ -49,7 +49,7 @@ test("manual stop stays paused until a new LMU session and then rearms", async (
   process.env.KYNOLITH_DESKTOP = "1";
   const { startCoachServer } = await import("./server.js");
   const dataDir = await mkdtemp(path.join(os.tmpdir(), "apex-manual-stop-"));
-  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir });
+  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir, prewarmVoices: false });
   const base = `http://127.0.0.1:${running.port}`;
   const pushFrames = async (session: "practice" | "qualifying", start: number) => {
     for (let index = 0; index < 80; index++) {

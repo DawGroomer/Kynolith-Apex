@@ -43,6 +43,15 @@ test("spotter ignores brief overlap and clear noise", () => {
   assert.equal(noise.some(cue => cue.id.startsWith("clear-right-")), false);
 });
 
+test("spotter suppresses overlap calls while stationary or in the pits", () => {
+  const stationary = new CoachingEngine();
+  stationary.ingest({ ...simulatedFrame(210_000), speedKph: 0, carLeft: true });
+  assert.equal(stationary.ingest({ ...simulatedFrame(210_300), speedKph: 0, carLeft: true }).some(cue => cue.id.startsWith("car-left-")), false);
+  const pits = new CoachingEngine();
+  pits.ingest({ ...simulatedFrame(211_000), speedKph: 50, inPits: true, carRight: true });
+  assert.equal(pits.ingest({ ...simulatedFrame(211_300), speedKph: 50, inPits: true, carRight: true }).some(cue => cue.id.startsWith("car-right-")), false);
+});
+
 test("coach checks in during otherwise clean running", () => {
   const engine = new CoachingEngine();
   engine.ingest(simulatedFrame(100_000));
