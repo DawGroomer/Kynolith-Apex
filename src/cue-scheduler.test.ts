@@ -40,3 +40,11 @@ test("active coaching permits no more than three spaced technique calls per lap"
   scheduler.enqueue([cue({ id: "next-lap", at: 300_000, expiresAt: 305_000 })]);
   assert.equal(scheduler.next({ ...simulatedFrame(300_000), timestamp: 300_000, lap: 3, brake: 0, lateralG: 0, steering: 0 })?.id, "next-lap");
 });
+
+test("critical call evicts queued noncritical narration", () => {
+  const scheduler = new CueScheduler();
+  scheduler.enqueue([cue({ id: "welcome", priority: "info", category: "lap", delayInHardPart: false })]);
+  scheduler.enqueue([cue({ id: "yellow", priority: "critical", category: "safety", delayInHardPart: false })]);
+  assert.equal(scheduler.next({ ...simulatedFrame(12_000), brake: 0, lateralG: 0, steering: 0 })?.id, "yellow");
+  assert.equal(scheduler.next({ ...simulatedFrame(20_000), brake: 0, lateralG: 0, steering: 0 }), null);
+});

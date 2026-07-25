@@ -24,6 +24,7 @@ export class CoachingEngine {
   private offTrackSeen = 0; private offTrackClear = 0; private offTrackActive = false; private lastTrackLimitsSteps = 0; private trackLimitsInitialized = false; private lapInvalidated = false;
   private lastImpactTimestamp = 0; private impactInitialized = false; private spinSeen = 0; private spinClear = 0; private spinActive = false; private lastIncidentAt = 0;
   private blueActive = false; private sectorYellowActive = false; private damageActive = false; private overheatingActive = false;
+  private yellowSeenAt = 0; private sectorYellowSeenAt = 0;
   private penalties = 0; private penaltiesInitialized = false; private rainBand = 0; private lockupSeen = 0;
 
   setInstructionMode(mode: "quiet" | "balanced" | "active"): void {
@@ -40,10 +41,21 @@ export class CoachingEngine {
 
     const cues: CoachingCue[] = [];
     if (!this.lastGuidanceAt) this.lastGuidanceAt = frame.timestamp;
-    if (frame.yellowFlag && !this.yellowActive) this.emit(cues, frame, "yellow", 0, "critical", "safety", "Yellow flag. No overtaking; reduce pace and watch for stopped cars.");
-    this.yellowActive = frame.yellowFlag;
-    if (frame.sectorYellow && !frame.yellowFlag && !this.sectorYellowActive) this.emit(cues, frame, "local-yellow", 0, "critical", "safety", "Local yellow. No overtaking. Be ready for an incident.");
-    this.sectorYellowActive = Boolean(frame.sectorYellow);
+    if (frame.yellowFlag) {
+      if (!this.yellowActive && !this.yellowSeenAt) this.yellowSeenAt = frame.timestamp;
+      if (!this.yellowActive && frame.timestamp - this.yellowSeenAt >= 500) {
+        this.yellowActive = true;
+        this.emit(cues, frame, "yellow", 0, "critical", "safety", "Yellow flag. No overtaking. Watch for stopped cars.");
+      }
+    } else { this.yellowSeenAt = 0; this.yellowActive = false; }
+    const localYellow = Boolean(frame.sectorYellow && !frame.yellowFlag);
+    if (localYellow) {
+      if (!this.sectorYellowActive && !this.sectorYellowSeenAt) this.sectorYellowSeenAt = frame.timestamp;
+      if (!this.sectorYellowActive && frame.timestamp - this.sectorYellowSeenAt >= 500) {
+        this.sectorYellowActive = true;
+        this.emit(cues, frame, "local-yellow", 0, "critical", "safety", "Local yellow. No overtaking. Watch for an incident.");
+      }
+    } else { this.sectorYellowSeenAt = 0; this.sectorYellowActive = false; }
     if (frame.blueFlag && !this.blueActive) this.emit(cues, frame, "blue-flag", 0, "race", "racecraft", "Blue flag. Faster car approaching. Stay predictable.");
     this.blueActive = Boolean(frame.blueFlag);
     if (this.penaltiesInitialized && (frame.penalties ?? 0) > this.penalties) this.emit(cues, frame, "new-penalty", 0, "critical", "safety", "New penalty. Check the message center and serve it within the required window.");

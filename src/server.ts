@@ -180,6 +180,14 @@ app.post("/api/local/speak", async (req, res) => {
   } catch (error) { res.status(500).json({ error: error instanceof Error ? error.message : "Neural speech failed" }); }
   finally { neuralSpeechBusy = false; }
 });
+app.post("/api/audio/delivery", (req, res) => {
+  const cueId = String(req.body?.cueId ?? "").slice(0, 160);
+  const requestToPlaybackMs = Number(req.body?.requestToPlaybackMs);
+  const telemetryToPlaybackMs = req.body?.telemetryToPlaybackMs == null ? null : Number(req.body.telemetryToPlaybackMs);
+  const engineName = req.body?.engine === "neural" ? "neural" : "system";
+  if (!cueId || !Number.isFinite(requestToPlaybackMs)) return res.status(400).json({ error: "Invalid audio delivery metric" });
+  res.status(recorder.recordAudioDelivery(cueId, requestToPlaybackMs, telemetryToPlaybackMs, engineName) ? 202 : 404).end();
+});
 async function processFrame(frame: TelemetryFrame): Promise<void> {
   state.frame = frame;
   const sessionKey = sessionKeyFor(frame);

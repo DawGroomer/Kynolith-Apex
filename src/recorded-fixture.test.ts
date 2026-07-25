@@ -8,7 +8,8 @@ test("sanitized LMU fixture replays race-control, weather, lockup, and puncture 
   const fixture = JSON.parse(await readFile(new URL("../test/fixtures/lmu-recorded-race-control.json", import.meta.url), "utf8")) as { schemaVersion: number; frames: TelemetryFrame[] };
   assert.equal(fixture.schemaVersion, 1);
   const engine = new CoachingEngine();
-  const cues = fixture.frames.flatMap(frame => engine.ingest(frame));
+  const stableFlagFrame = { ...fixture.frames.at(-1)!, timestamp: fixture.frames[0]!.timestamp + 600 };
+  const cues = [...fixture.frames, stableFlagFrame].flatMap(frame => engine.ingest(frame));
   for (const prefix of ["local-yellow-", "blue-flag-", "new-penalty-", "rain-increase-", "wheel-lock-", "severe-damage-"]) {
     assert.equal(cues.some(cue => cue.id.startsWith(prefix)), true, `missing ${prefix}`);
   }

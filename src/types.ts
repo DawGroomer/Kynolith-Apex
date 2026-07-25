@@ -118,7 +118,15 @@ export interface SessionSummary {
 export interface RecordedSession {
   summary: SessionSummary;
   frames: TelemetryFrame[];
-  cues: Array<{ cue: CoachingCue; lap: number; lapDistance: number }>;
+  cues: Array<{ cue: CoachingCue; lap: number; lapDistance: number; audioDelivery?: AudioDeliveryMetric }>;
+}
+
+export interface AudioDeliveryMetric {
+  measuredAt: number;
+  requestToPlaybackMs: number;
+  telemetryToPlaybackMs: number | null;
+  engine: "neural" | "system";
+  deadlineMet: boolean;
 }
 
 export interface TrackCorner {

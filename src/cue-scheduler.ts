@@ -23,6 +23,11 @@ export class CueScheduler {
 
   enqueue(cues: CoachingCue[]): void {
     for (const cue of cues) {
+      // A safety/spotter call invalidates queued narration. This prevents a
+      // welcome or corner review from speaking immediately after an incident.
+      if (cue.priority === "critical") {
+        for (const [id, queued] of this.queue) if (queued.priority !== "critical") this.queue.delete(id);
+      }
       // Technique advice loses value almost immediately. Keep only the newest
       // observation so the coach cannot narrate a corner that is already gone.
       if (cue.priority === "technique") {
@@ -48,6 +53,9 @@ export class CueScheduler {
     if (frame.timestamp - this.lastSpokenAt < spacing) return null;
     if (cue.priority === "technique" && (this.techniqueSpokenThisLap >= this.techniqueBudgetPerLap || frame.timestamp - this.lastTechniqueAt < this.techniqueMinimumSpacingMs)) return null;
     this.queue.delete(cue.id);
+    if (cue.priority === "critical") {
+      for (const [id, queued] of this.queue) if (queued.priority !== "critical") this.queue.delete(id);
+    }
     this.lastSpokenAt = frame.timestamp;
     if (cue.priority === "technique") { this.lastTechniqueAt = frame.timestamp; this.techniqueSpokenThisLap++; }
     return cue;

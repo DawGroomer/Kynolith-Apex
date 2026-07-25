@@ -32,6 +32,17 @@ export class SessionRecorder {
     this.current?.cues.push({ cue, lap: frame.lap, lapDistance: frame.lapDistance });
   }
 
+  recordAudioDelivery(cueId: string, requestToPlaybackMs: number, telemetryToPlaybackMs: number | null, engine: "neural" | "system"): boolean {
+    const entry = this.current?.cues.find(candidate => candidate.cue.id === cueId);
+    if (!entry || !Number.isFinite(requestToPlaybackMs)) return false;
+    entry.audioDelivery = {
+      measuredAt: Date.now(), requestToPlaybackMs: Math.max(0, Math.round(requestToPlaybackMs)),
+      telemetryToPlaybackMs: telemetryToPlaybackMs == null || !Number.isFinite(telemetryToPlaybackMs) ? null : Math.max(0, Math.round(telemetryToPlaybackMs)),
+      engine, deadlineMet: telemetryToPlaybackMs != null && telemetryToPlaybackMs <= 200
+    };
+    return true;
+  }
+
   async finish(): Promise<SessionSummary | null> {
     const session = this.current;
     this.current = null;
@@ -114,7 +125,9 @@ export function summarize(session: RecordedSession): SessionSummary {
   const laps: RecordedLap[] = [...grouped.entries()].sort(([a], [b]) => a - b).map(([lap, frames]) => {
     const { frames: _frames, ...analysis } = analyzeLapQuality(lap, frames); return analysis;
   });
-  const completeTimes = laps.filter(lap => lap.complete && lap.durationSeconds > 20).map(lap => lap.durationSeconds);
+  const trustedTimes = laps.filter(lap => lap.complete && lap.durationSeconds > 20 && lap.quality?.status === "trusted").map(lap => lap.durationSeconds);
+  const center = median(trustedTimes);
+  const completeTimes = trustedTimes.filter(time => center === null || (time >= center * .85 && time <= center * 1.15));
   const categories = new Map<string, number>();
   for (const entry of session.cues) categories.set(entry.cue.category, (categories.get(entry.cue.category) ?? 0) + 1);
   const primary = [...categories.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -137,4 +150,5 @@ function focusText(category?: string): string {
 }
 
 function average(values: number[]): number { return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0; }
+function median(values: number[]): number | null { if (!values.length) return null; const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2; }
 function standardDeviation(values: number[]): number { const mean = average(values); return Math.sqrt(average(values.map(value => (value - mean) ** 2))); }
