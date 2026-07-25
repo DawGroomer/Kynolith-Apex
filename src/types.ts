@@ -123,9 +123,19 @@ export interface RecordedSession {
 
 export interface AudioDeliveryMetric {
   measuredAt: number;
+  telemetryEventAt?: number | undefined;
+  queuedAt?: number | undefined;
   requestToPlaybackMs: number;
   telemetryToPlaybackMs: number | null;
-  engine: "neural" | "system";
+  queueDelayMs?: number;
+  synthesisMs?: number;
+  playbackStartedAt?: number | undefined;
+  engine: "kokoro-q8" | "prerecorded" | "system";
+  voice?: string;
+  role?: "coach" | "spotter";
+  cacheHit?: boolean;
+  outcome?: "played" | "cancelled" | "dropped" | "failed";
+  fallbackReason?: string | null;
   deadlineMet: boolean;
 }
 

@@ -32,14 +32,10 @@ export class SessionRecorder {
     this.current?.cues.push({ cue, lap: frame.lap, lapDistance: frame.lapDistance });
   }
 
-  recordAudioDelivery(cueId: string, requestToPlaybackMs: number, telemetryToPlaybackMs: number | null, engine: "neural" | "system"): boolean {
+  recordAudioDelivery(cueId: string, metric: import("./types.js").AudioDeliveryMetric): boolean {
     const entry = this.current?.cues.find(candidate => candidate.cue.id === cueId);
-    if (!entry || !Number.isFinite(requestToPlaybackMs)) return false;
-    entry.audioDelivery = {
-      measuredAt: Date.now(), requestToPlaybackMs: Math.max(0, Math.round(requestToPlaybackMs)),
-      telemetryToPlaybackMs: telemetryToPlaybackMs == null || !Number.isFinite(telemetryToPlaybackMs) ? null : Math.max(0, Math.round(telemetryToPlaybackMs)),
-      engine, deadlineMet: telemetryToPlaybackMs != null && telemetryToPlaybackMs <= 200
-    };
+    if (!entry || !Number.isFinite(metric.requestToPlaybackMs)) return false;
+    entry.audioDelivery = metric;
     return true;
   }
 

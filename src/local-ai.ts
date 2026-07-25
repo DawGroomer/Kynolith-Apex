@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { LMU_KNOWLEDGE, selectLmuKnowledge, type LmuKnowledgeCard } from "./lmu-knowledge.js";
 import type { CoachState, SessionSummary } from "./types.js";
+import { directSpeech, roleSpeed, type SpeechEmotion, type SpeechRole } from "./prosody-director.js";
 
 const SPEECH_MODEL = "onnx-community/whisper-tiny.en";
 const COACH_MODEL = "onnx-community/Qwen3-0.6B-ONNX";
@@ -12,7 +13,6 @@ export interface LocalAiOptions {
   bundledModelsDirectory?: string;
   allowModelDownloads?: boolean;
 }
-
 export interface LocalAiStatus {
   speechModel: string;
   coachModel: string;
@@ -56,12 +56,12 @@ export class LocalAi {
     await this.getGenerator();
   }
 
-  async synthesize(text: string, voice = "af_heart", speed = 1): Promise<ArrayBuffer> {
+  async synthesize(text: string, voice = "af_heart", speed = 1, role: SpeechRole = "coach", emotion: SpeechEmotion = "calm"): Promise<ArrayBuffer> {
     const synthesizer = await this.getSynthesizer();
     const selectedVoice = KOKORO_VOICES.has(voice) ? voice : "af_heart";
-    const audio = await synthesizer.generate(prepareSpeechText(text), {
+    const audio = await synthesizer.generate(directSpeech(text, role, emotion), {
       voice: selectedVoice,
-      speed: Math.min(1.25, Math.max(0.8, speed))
+      speed: roleSpeed(speed, role, emotion)
     });
     return audio.toWav();
   }
@@ -203,20 +203,4 @@ function cleanRadioAnswer(value: string): string {
   const answer = sentences.slice(0, 2).join(" ").slice(0, 360).trim();
   if (!answer) return "Apex needs more comparable LMU telemetry before recommending a change.";
   return /[.!?]$/.test(answer) ? answer : `${answer}.`;
-}
-
-function prepareSpeechText(value: string): string {
-  return value
-    .replace(/\bLMU\b/g, "L M U")
-    .replace(/\bLMGT3\b/g, "L M G T three")
-    .replace(/\bLMDh\b/gi, "L M D h")
-    .replace(/\bLMH\b/g, "L M H")
-    .replace(/\bABS\b/g, "A B S")
-    .replace(/\bTC\b/g, "traction control")
-    .replace(/\bPSI\b/g, "P S I")
-    .replace(/\bMPH\b/g, "miles per hour")
-    .replace(/\bP(\d+)\b/g, "position $1")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 600);
 }

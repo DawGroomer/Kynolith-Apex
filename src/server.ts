@@ -18,6 +18,7 @@ import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipe
 import { MINIMUM_CALIBRATION_LABELS, ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
 import { convertReferenceFile } from "./reference-converter.js";
 import type { CoachState, TelemetryFrame } from "./types.js";
+import { VoiceRuntime, type VoiceRequest } from "./voice-runtime.js";
 
 export interface CoachServerOptions {
   port?: number;
@@ -63,11 +64,20 @@ let welcomedSessionKey = "";
 let terminalSession = false;
 let manuallyStoppedSessionKey = "";
 let manualStopSawTerminal = false;
-let neuralSpeechBusy = false;
 let lastStrongLanguageAt = 0;
 let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
 const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
 const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(12, processFrame, 180);
+const voiceRuntime = new VoiceRuntime(path.join(dataDir, "voice-cache"), request => localAi.synthesize(request.text, request.voice, request.speed, request.role, request.emotion));
+const voiceRuntimeStats = { requests: 0, cacheHits: 0, failures: 0, fallbacks: 0, lastEngine: "none", lastVoice: "none", lastSynthesisMs: 0, lastQueueDelayMs: 0 };
+const spotterWarmup = [
+  ["car-left", "Car left. Hold your line."], ["car-right", "Car right. Hold your line."], ["clear-left", "Clear left."], ["clear-right", "Clear right."],
+  ["yellow", "Yellow flag! No overtaking. Watch for stopped cars."], ["local-yellow", "Local yellow! No overtaking. Watch for an incident."],
+  ["track-edge", "Track limits. Two wheels off. Bring it back inside."], ["impact", "Impact! Hold the brakes. Check traffic, then rejoin safely."]
+] as const;
+if (process.env.KYNOLITH_DESKTOP === "1") {
+  void voiceRuntime.prewarm(spotterWarmup.map(([phraseKey, text]) => ({ text, phraseKey, voice: settings.get().spotterVoice, speed: settings.get().voiceRate, role: "spotter", emotion: "urgent" }))).catch(() => { voiceRuntimeStats.failures++; });
+}
 const acceptTelemetry = (frame: TelemetryFrame): boolean => { state.connected = true; state.source = "lmu"; return telemetryPipeline.push(frame); };
 
 app.use(express.json({ limit: "25mb" }));
@@ -81,6 +91,7 @@ app.put("/api/settings", async (req, res) => {
     scheduler.setMinimumSpacing(spacingFor(next.speechFrequency));
     scheduler.setTechniquePolicy(next.speechFrequency);
     engine.setInstructionMode(next.speechFrequency);
+    if (process.env.KYNOLITH_DESKTOP === "1") void voiceRuntime.prewarm(spotterWarmup.map(([phraseKey, text]) => ({ text, phraseKey, voice: next.spotterVoice, speed: next.voiceRate, role: "spotter", emotion: "urgent" }))).catch(() => { voiceRuntimeStats.failures++; });
     res.json(next);
   } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid settings" }); }
 });
@@ -108,6 +119,10 @@ app.post("/api/telemetry/disconnect", async (_req, res) => {
   await recorder.finish();
   res.sendStatus(204);
 });
+app.get("/api/audio/status", (_req, res) => res.json({
+  coach: `${voiceLabel(settings.get().neuralVoice)} Neural`, spotter: `${voiceLabel(settings.get().spotterVoice)} Cached Neural`,
+  fallbacksThisSession: voiceRuntimeStats.fallbacks, ...voiceRuntimeStats
+}));
 app.post("/api/session/stop", async (_req, res) => {
   await telemetryPipeline.idle();
   const frame = state.frame;
@@ -168,25 +183,36 @@ app.post("/api/local/ask", async (req, res) => {
 });
 app.post("/api/local/speak", async (req, res) => {
   try {
-    if (neuralSpeechBusy) return res.status(429).json({ error: "Neural voice busy; use immediate system fallback" });
-    if (os.freemem() < 4 * 1024 ** 3) return res.status(503).json({ error: "Memory guard enabled; use system voice fallback" });
+    if (os.freemem() < 2 * 1024 ** 3) return res.status(503).json({ error: "Memory guard blocked neural speech", code: "memory_guard" });
     const text = String(req.body?.text ?? "").trim().slice(0, 600);
     if (!text) return res.status(400).json({ error: "Speech text is required" });
     const voice = String(req.body?.voice ?? "af_heart").slice(0, 40);
     const speed = Number(req.body?.speed ?? 1);
-    neuralSpeechBusy = true;
-    const wav = await localAi.synthesize(text, voice, Number.isFinite(speed) ? speed : 1);
-    res.type("audio/wav").send(Buffer.from(wav));
-  } catch (error) { res.status(500).json({ error: error instanceof Error ? error.message : "Neural speech failed" }); }
-  finally { neuralSpeechBusy = false; }
+    const role = req.body?.role === "spotter" ? "spotter" : "coach";
+    const emotion = ["calm", "positive", "urgent", "firm"].includes(req.body?.emotion) ? req.body.emotion : "calm";
+    voiceRuntimeStats.requests++;
+    const result = await voiceRuntime.render({ text, voice, speed: Number.isFinite(speed) ? speed : 1, role, emotion, phraseKey: String(req.body?.phraseKey ?? "").slice(0, 80) || undefined } as VoiceRequest);
+    if (result.cacheHit) voiceRuntimeStats.cacheHits++;
+    Object.assign(voiceRuntimeStats, { lastEngine: result.engine, lastVoice: voice, lastSynthesisMs: result.synthesisMs, lastQueueDelayMs: result.queueDelayMs });
+    res.set({ "X-Apex-Engine": result.engine, "X-Apex-Voice": voice, "X-Apex-Cache": result.cacheHit ? "hit" : "miss", "X-Apex-Synthesis-Ms": String(result.synthesisMs), "X-Apex-Queue-Ms": String(result.queueDelayMs) });
+    res.type("audio/wav").send(Buffer.from(result.wav));
+  } catch (error) { voiceRuntimeStats.failures++; res.status(500).json({ error: error instanceof Error ? error.message : "Neural speech failed", code: "neural_failed" }); }
 });
 app.post("/api/audio/delivery", (req, res) => {
   const cueId = String(req.body?.cueId ?? "").slice(0, 160);
   const requestToPlaybackMs = Number(req.body?.requestToPlaybackMs);
   const telemetryToPlaybackMs = req.body?.telemetryToPlaybackMs == null ? null : Number(req.body.telemetryToPlaybackMs);
-  const engineName = req.body?.engine === "neural" ? "neural" : "system";
   if (!cueId || !Number.isFinite(requestToPlaybackMs)) return res.status(400).json({ error: "Invalid audio delivery metric" });
-  res.status(recorder.recordAudioDelivery(cueId, requestToPlaybackMs, telemetryToPlaybackMs, engineName) ? 202 : 404).end();
+  const metric: import("./types.js").AudioDeliveryMetric = {
+    measuredAt: Date.now(), telemetryEventAt: Number(req.body?.telemetryEventAt) || undefined, queuedAt: Number(req.body?.queuedAt) || undefined,
+    requestToPlaybackMs: Math.max(0, Math.round(requestToPlaybackMs)), telemetryToPlaybackMs: telemetryToPlaybackMs == null || !Number.isFinite(telemetryToPlaybackMs) ? null : Math.max(0, Math.round(telemetryToPlaybackMs)),
+    queueDelayMs: Math.max(0, Number(req.body?.queueDelayMs) || 0), synthesisMs: Math.max(0, Number(req.body?.synthesisMs) || 0), playbackStartedAt: Number(req.body?.playbackStartedAt) || undefined,
+    engine: req.body?.engine === "system" ? "system" : req.body?.engine === "prerecorded" ? "prerecorded" : "kokoro-q8", voice: String(req.body?.voice ?? "").slice(0, 40),
+    role: req.body?.role === "spotter" ? "spotter" : "coach", cacheHit: Boolean(req.body?.cacheHit), outcome: ["played", "cancelled", "dropped", "failed"].includes(req.body?.outcome) ? req.body.outcome : "played",
+    fallbackReason: req.body?.fallbackReason ? String(req.body.fallbackReason).slice(0, 160) : null, deadlineMet: telemetryToPlaybackMs != null && telemetryToPlaybackMs <= 200
+  };
+  if (metric.fallbackReason) voiceRuntimeStats.fallbacks++;
+  res.status(recorder.recordAudioDelivery(cueId, metric) ? 202 : 404).end();
 });
 async function processFrame(frame: TelemetryFrame): Promise<void> {
   state.frame = frame;
@@ -208,6 +234,7 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   if (state.source === "lmu") await recorder.recordFrame(frame);
   if (state.source === "lmu" && sessionKey !== welcomedSessionKey) {
     welcomedSessionKey = sessionKey;
+    voiceRuntimeStats.fallbacks = 0;
     const name = settings.get().driverName;
     engine.setCurriculumLevel(cachedAcademy.curriculumLevel);
     scheduler.enqueue([{
@@ -242,6 +269,7 @@ function broadcast(cue: import("./types.js").CoachingCue | null): void {
 }
 
 function sessionKeyFor(frame: TelemetryFrame): string { return `${frame.track}|${frame.vehicle}|${frame.session}`; }
+function voiceLabel(value: string): string { return ({ am_michael: "Michael", am_fenrir: "Fenrir", af_heart: "Heart", af_bella: "Bella" } as Record<string, string>)[value] ?? value; }
 
 function allowedToSpeak(cue: { priority: string; category: string }, config: ReturnType<SettingsStore["get"]>): boolean {
   if (cue.category === "safety") return config.speakSafety;
