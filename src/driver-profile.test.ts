@@ -42,3 +42,17 @@ test("quarantined history cannot depress progression or inflate completed laps",
   assert.equal(profile.dataQuality.quarantinedSessions, 1);
   assert.notEqual(profile.trend, "declined");
 });
+
+test("fragmented implausibly fast laps cannot become the pace baseline", () => {
+  const clean = session("clean", 300, 107, 85);
+  clean.laps = [106.9, 107.4, 108.1].map((durationSeconds, index) => ({ ...clean.laps[0]!, lap: index + 1, durationSeconds }));
+  clean.fastestLapSeconds = 106.9;
+  const previous = session("previous", 200, 109, 82);
+  previous.laps = [108.8, 109.2, 109.5].map((durationSeconds, index) => ({ ...previous.laps[0]!, lap: index + 1, durationSeconds }));
+  previous.fastestLapSeconds = 108.8;
+  const fragment = session("fragment", 100, 72, 90);
+  fragment.fastestLapSeconds = 72;
+  const profile = buildDriverProfile("Will", [clean, previous, fragment]);
+  assert.ok((profile.components?.pace ?? 0) >= 99);
+  assert.notEqual(profile.components?.pace, 0);
+});

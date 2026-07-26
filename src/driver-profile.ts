@@ -31,10 +31,14 @@ export function buildDriverProfile(driverName: string, all: SessionSummary[], ca
   const dataQuality = qualitySummary(all, sessions.length, calibration);
   if (!sessions.length) return { driverName: driverName || "Driver", score: null, change: null, trend: "new", level: "Rookie",
     sessions: 0, completedLaps: 0, personalBests: 0, components: null, currentFocus: "Complete a trusted clean timed session to establish your baseline.", history: [], academy: emptyAcademy(), dataQuality };
-  const bestByCombo = new Map<string, number>();
-  for (const session of sessions) if (session.fastestLapSeconds) {
-    const key = `${session.track}|${session.vehicle}`; bestByCombo.set(key, Math.min(bestByCombo.get(key) ?? Infinity, session.fastestLapSeconds));
+  const lapTimesByCombo = new Map<string, number[]>();
+  for (const session of sessions) {
+    const key = `${session.track}|${session.vehicle}`;
+    const values = lapTimesByCombo.get(key) ?? [];
+    values.push(...trustedCompleteLapTimes(session));
+    lapTimesByCombo.set(key, values);
   }
+  const bestByCombo = new Map([...lapTimesByCombo].map(([key, values]) => [key, robustPersonalBest(values)]));
   const scored = sessions.map(session => scoreSession(session, bestByCombo.get(`${session.track}|${session.vehicle}`) ?? null, calibration));
   const latest = scored[0]!;
   const previous = scored.slice(1).find(entry => entry.session.track === latest.session.track && entry.session.vehicle === latest.session.vehicle) ?? scored[1];
@@ -99,9 +103,20 @@ function scoreSession(session: SessionSummary, personalBest: number | null, cali
   const braking = average(laps.map(lap => lap.brakingSmoothness));
   const throttle = average(laps.map(lap => lap.throttleSmoothness));
   const consistency = clamp(100 - (session.consistencySeconds ?? 5) * 8);
-  const pace = session.fastestLapSeconds && personalBest ? clamp(100 - ((session.fastestLapSeconds - personalBest) / personalBest) * 500) : 60;
+  const sessionBest = minimum(laps.map(lap => lap.durationSeconds));
+  const pace = sessionBest && personalBest ? clamp(100 - ((sessionBest - personalBest) / personalBest) * 500) : 60;
   const components = applyScoreCalibration({ braking: round(braking), throttle: round(throttle), consistency: round(consistency), pace: round(pace) }, calibration);
   return { session, components, score: round(components.braking * .3 + components.throttle * .3 + components.consistency * .2 + components.pace * .2) };
+}
+function trustedCompleteLapTimes(session: SessionSummary): number[] {
+  return session.laps.filter(lap => lap.complete && (!lap.quality || lap.quality.status === "trusted") && lap.durationSeconds > 20).map(lap => lap.durationSeconds);
+}
+function robustPersonalBest(values: number[]): number {
+  const ordered = values.filter(value => Number.isFinite(value) && value > 20).sort((a, b) => a - b);
+  if (!ordered.length) return Infinity;
+  const middle = ordered[Math.floor(ordered.length / 2)]!;
+  const credible = ordered.filter(value => value >= middle * .8 && value <= middle * 1.5);
+  return minimum(credible) ?? middle;
 }
 function qualitySummary(all: SessionSummary[], trustedCount: number, calibration: ScoreCalibration | null): DriverProfile["dataQuality"] {
   const limitedSessions = all.filter(session => session.quality?.status === "limited").length;
@@ -112,5 +127,6 @@ function qualitySummary(all: SessionSummary[], trustedCount: number, calibration
   return { totalSessions: all.length, trustedSessions: trustedCount, limitedSessions, quarantinedSessions, scoreConfidence, calibrationStatus };
 }
 function average(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 50; }
+function minimum(values: number[]): number | null { return values.length ? Math.min(...values) : null; }
 function clamp(value: number): number { return Math.max(0, Math.min(100, value)); }
 function round(value: number): number { return Math.round(value * 10) / 10; }
