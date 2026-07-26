@@ -71,10 +71,11 @@ export function assessSessionQuality(laps: RecordedLap[], frames: TelemetryFrame
 
 export function shouldSplitSession(previous: TelemetryFrame, next: TelemetryFrame): string | null {
   const gap = next.timestamp - previous.timestamp;
-  if (gap <= 0) return "Telemetry timestamp reset";
+  if (gap < -1_000) return "Telemetry timestamp reset";
   if (gap > 5_000) return "Telemetry gap exceeded five seconds";
   if (Math.abs(next.lap - previous.lap) > 1) return "Lap counter jumped unexpectedly";
-  if (next.lap === previous.lap && next.lapDistance < previous.lapDistance - .35) return "Lap distance reset without a lap transition";
+  const startFinishWrap = previous.lapDistance > .9 && next.lapDistance < .1 && gap >= 0 && gap < 1_000;
+  if (next.lap === previous.lap && next.lapDistance < previous.lapDistance - .35 && !startFinishWrap) return "Lap distance reset without a lap transition";
   return null;
 }
 

@@ -60,6 +60,15 @@ export function buildFujiMcLarenBenchmark(base: DrivingReference): DrivingRefere
   };
 }
 
+export function selectFastestCompleteGeometry(frames: TelemetryFrame[]): { frames: TelemetryFrame[]; seconds: number } {
+  const groups = new Map<number, TelemetryFrame[]>();
+  for (const frame of frames) { const list = groups.get(frame.lap) ?? []; list.push(frame); groups.set(frame.lap, list); }
+  const complete = [...groups.values()].filter(list => list.length >= 50 && list[0]!.lapDistance < .08 && list.at(-1)!.lapDistance > .9);
+  const fastest = complete.sort((a, b) => duration(a) - duration(b))[0];
+  if (!fastest) throw new Error("Driver-owned recording has no complete lap for benchmark geometry");
+  return { frames: fastest, seconds: duration(fastest) };
+}
+
 function transformFrame(frame: TelemetryFrame, base: TelemetryFrame[], metadata: CommunityBenchmarkMetadata, start: number, scale: number): TelemetryFrame {
   const target = metadata.targets.find(item => inCorner(item.cornerId, frame.lapDistance));
   let brake = frame.brake, throttle = frame.throttle, speedKph = frame.speedKph;
@@ -88,3 +97,4 @@ const zones: Record<string, [number, number, number]> = {
 function inCorner(id: string, distance: number) { const zone = zones[id]; return !!zone && distance >= zone[0] && distance <= zone[2]; }
 function nearApex(id: string, distance: number) { const zone = zones[id]; return !!zone && Math.abs(distance - zone[1]) <= .018; }
 function sampleAt(frames: TelemetryFrame[], distance: number): TelemetryFrame { return frames.reduce((best, frame) => Math.abs(frame.lapDistance - distance) < Math.abs(best.lapDistance - distance) ? frame : best, frames[0]!); }
+function duration(frames: TelemetryFrame[]) { return (frames.at(-1)!.timestamp - frames[0]!.timestamp) / 1000; }

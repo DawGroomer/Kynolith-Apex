@@ -36,6 +36,11 @@ test("session boundary detector catches telemetry stalls and lap resets", () => 
   const previous = lapFrames({ count: 2 })[0]!, next = { ...previous, timestamp: previous.timestamp + 6_000 };
   assert.match(shouldSplitSession(previous, next) ?? "", /five seconds/);
   assert.match(shouldSplitSession(previous, { ...previous, timestamp: previous.timestamp + 100, lap: 5 }) ?? "", /Lap counter/);
+  assert.match(shouldSplitSession(previous, { ...previous, timestamp: previous.timestamp - 2_000 }) ?? "", /timestamp reset/);
+  assert.equal(shouldSplitSession(previous, { ...previous, timestamp: previous.timestamp }), null, "duplicate shared-memory frames stay in the session");
+  const line = { ...previous, timestamp: previous.timestamp + 100, lapDistance: .97 };
+  assert.equal(shouldSplitSession(line, { ...line, timestamp: line.timestamp + 100, lapDistance: .01 }), null, "LMU may update lap distance before its lap counter");
+  assert.match(shouldSplitSession({ ...line, lapDistance: .7 }, { ...line, timestamp: line.timestamp + 100, lapDistance: .1 }) ?? "", /Lap distance reset/);
 });
 
 test("corpus baseline quarantines an otherwise continuous implausibly slow lap", () => {
