@@ -64,6 +64,8 @@ const localAi = new LocalAi(path.join(dataDir, "models"), {
 });
 let welcomedSessionKey = "";
 let terminalSession = false;
+let terminalCandidateSince = 0;
+let terminalCandidateFrames = 0;
 let manuallyStoppedSessionKey = "";
 let manualStopSawTerminal = false;
 let lastStrongLanguageAt = 0;
@@ -257,10 +259,15 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   if (state.source === "lmu" && sessionTerminal) {
     state.sessionActive = false;
     if (manuallyStoppedSessionKey) manualStopSawTerminal = true;
-    if (!terminalSession) { terminalSession = true; scheduler.clear(); await recorder.finish(); welcomedSessionKey = ""; }
+    if (!terminalCandidateFrames) terminalCandidateSince = frame.timestamp;
+    terminalCandidateFrames++;
+    const sustainedTerminal = terminalCandidateFrames >= 3 && frame.timestamp - terminalCandidateSince >= 200;
+    if (sustainedTerminal && !terminalSession) { terminalSession = true; scheduler.clear(); await recorder.finish(); welcomedSessionKey = ""; }
     broadcast(null);
     return;
   }
+  terminalCandidateSince = 0;
+  terminalCandidateFrames = 0;
   const supportedSession = frame.session === "practice" || frame.session === "qualifying" || frame.session === "race";
   const shouldRearm = Boolean(manuallyStoppedSessionKey) && supportedSession && (sessionKey !== manuallyStoppedSessionKey || manualStopSawTerminal);
   if (shouldRearm) { manuallyStoppedSessionKey = ""; manualStopSawTerminal = false; }

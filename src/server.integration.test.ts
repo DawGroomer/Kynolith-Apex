@@ -38,9 +38,30 @@ test("LMU terminal game phase finalizes the session without a disconnect", async
       running.ingestTelemetry({ ...simulatedFrame(timestamp), timestamp, lap: 2, lapDistance: index / 899, gamePhase: 5, sessionTimeRemainingSeconds: 300 });
       if (index % 10 === 0) await new Promise(resolve => setTimeout(resolve, 1));
     }
-    running.ingestTelemetry({ ...simulatedFrame(2_113_000), timestamp: 2_113_000, lap: 3, lapDistance: .02, gamePhase: 8, sessionTimeRemainingSeconds: 0, inPits: true });
+    for (let index = 0; index < 3; index++) running.ingestTelemetry({ ...simulatedFrame(2_113_000 + index * 125), timestamp: 2_113_000 + index * 125, lap: 3, lapDistance: .02, gamePhase: 8, sessionTimeRemainingSeconds: 0, inPits: true });
     await new Promise(resolve => setTimeout(resolve, 200));
     const sessions = await fetch(`http://127.0.0.1:${running.port}/api/sessions`).then(response => response.json()) as Array<{ laps: unknown[] }>;
+    assert.equal(sessions.length, 1);
+  } finally { await running.close(); }
+});
+
+test("a transient LMU terminal phase does not split an active session", async () => {
+  process.env.KYNOLITH_DESKTOP = "1";
+  const { startCoachServer } = await import("./server.js");
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), "apex-terminal-debounce-"));
+  const running = await startCoachServer({ port: 0, publicDir: path.resolve("public"), dataDir, prewarmVoices: false });
+  try {
+    for (let index = 0; index < 80; index++) {
+      running.ingestTelemetry({ ...simulatedFrame(4_000_000 + index * 125), timestamp: 4_000_000 + index * 125, lap: 2, lapDistance: index / 160, gamePhase: 5 });
+      if (index % 8 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+    }
+    running.ingestTelemetry({ ...simulatedFrame(4_010_000), timestamp: 4_010_000, lap: 2, lapDistance: .5, gamePhase: 8 });
+    for (let index = 1; index <= 80; index++) {
+      running.ingestTelemetry({ ...simulatedFrame(4_010_000 + index * 125), timestamp: 4_010_000 + index * 125, lap: 2, lapDistance: .5 + index / 160, gamePhase: 5 });
+      if (index % 8 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+    }
+    await running.disconnectTelemetry();
+    const sessions = await fetch(`http://127.0.0.1:${running.port}/api/sessions`).then(response => response.json()) as unknown[];
     assert.equal(sessions.length, 1);
   } finally { await running.close(); }
 });
@@ -66,7 +87,7 @@ test("manual stop stays paused until a new LMU session and then rearms", async (
     let sessions = await fetch(`${base}/api/sessions`).then(response => response.json()) as unknown[];
     assert.equal(sessions.length, 1);
     await pushFrames("qualifying", 3_200_000);
-    running.ingestTelemetry({ ...simulatedFrame(3_241_000), timestamp: 3_241_000, session: "qualifying", gamePhase: 8, sessionTimeRemainingSeconds: 0, inPits: true });
+    for (let index = 0; index < 3; index++) running.ingestTelemetry({ ...simulatedFrame(3_241_000 + index * 125), timestamp: 3_241_000 + index * 125, session: "qualifying", gamePhase: 8, sessionTimeRemainingSeconds: 0, inPits: true });
     await new Promise(resolve => setTimeout(resolve, 150));
     sessions = await fetch(`${base}/api/sessions`).then(response => response.json()) as unknown[];
     assert.equal(sessions.length, 2);
