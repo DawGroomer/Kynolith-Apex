@@ -14,6 +14,12 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
 Push-Location $projectRoot
 try {
+  Write-Host "Validating packaging prerequisites before packaging..."
+  & pnpm validate:packaging
+  if ($LASTEXITCODE -ne 0) {
+    throw "Packaging validation failed."
+  }
+
   & pnpm exec electron-builder --win portable "--config.directories.output=$packageRoot"
   if ($LASTEXITCODE -ne 0) {
     throw "electron-builder failed with exit code $LASTEXITCODE"

@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Coach Server (tsx)",
+      "type": "pwa-node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "tsx", "--inspect=9229", "src/server.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Launch Electron Desktop (Main)",
+      "type": "pwa-node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "electron", "--inspect=9229", "--remote-debugging-port=9223", "."],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build TypeScript",
+      "sourceMaps": true,
+      "autoAttachChildProcesses": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Attach to Running Server",
+      "type": "pwa-node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Attach to Electron Renderer",
+      "type": "pwa-chrome",
+      "request": "attach",
+      "port": 9223,
+      "urlFilter": "http://127.0.0.1:4377/*",
+      "webRoot": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch Full Coach Workspace",
+      "configurations": ["Launch Coach Server (tsx)", "Launch Electron Desktop (Main)"]
+    },
+    {
+      "name": "Launch Full Coach + Renderer",
+      "configurations": ["Launch Coach Server (tsx)", "Launch Electron Desktop (Main)", "Attach to Electron Renderer"]
+    }
+  ]
+}

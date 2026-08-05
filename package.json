@@ -18,8 +18,11 @@
     "build": "tsc",
     "build:bridge": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-bridge.ps1",
     "desktop": "electron .",
-    "dist:win": "pnpm build:bridge && pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
-    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
+    "dist:win": "pnpm validate:packaging && pnpm build:bridge && pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
+    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1",
+    "bootstrap:dotnet": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-dotnet.ps1",
+    "validate:packaging": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-packaging.ps1",
+    "smoke:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-portable.ps1"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
