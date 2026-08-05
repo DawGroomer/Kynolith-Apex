@@ -7,7 +7,6 @@ App/
 data/
 work/
 native/build/
-release/
 .tools/
 bridge/bin/
 bridge/obj/
