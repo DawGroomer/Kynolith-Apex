@@ -1,12 +1,15 @@
 import type { TelemetryFrame } from "./types.js";
 
-export function simulatedFrame(t = Date.now()): TelemetryFrame {
-  const phase = (t / 1000) % 90;
+const simulatorStartedAt = Date.now();
+
+export function simulatedFrame(t = Date.now(), startedAt = simulatorStartedAt): TelemetryFrame {
+  const elapsedSeconds = Math.max(0, (t - startedAt) / 1000);
+  const phase = elapsedSeconds % 90;
   const corner = Math.sin(phase * 0.38);
   const braking = Math.max(0, Math.sin(phase * 0.7 + 2.4));
   return {
     timestamp: t, session: "practice", track: "Circuit de la Sarthe", vehicle: "Hypercar Prototype",
-    lap: Math.floor(t / 90_000) + 1, lapDistance: phase / 90,
+    lap: Math.floor(elapsedSeconds / 90) + 1, lapDistance: phase / 90,
     worldX: Math.cos(phase / 90 * Math.PI * 2) * 950 + Math.sin(phase / 90 * Math.PI * 6) * 90,
     worldZ: Math.sin(phase / 90 * Math.PI * 2) * 540,
     speedKph: 205 + 92 * Math.cos(phase * 0.38),
