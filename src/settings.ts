@@ -23,6 +23,7 @@ export interface CoachSettings {
   controllerId: string;
   controllerButton: number;
   keyboardKey: string;
+  autoCheckUpdates: boolean;
 }
 
 export const defaultSettings: CoachSettings = {
@@ -33,7 +34,8 @@ export const defaultSettings: CoachSettings = {
   speechFrequency: "balanced", autoSpeak: true,
   speakSafety: true, speakRace: true, speakTechnique: true, speakInfo: true,
   microphoneDeviceId: "", inputSensitivity: 6,
-  controllerId: "", controllerButton: 0, keyboardKey: "Space"
+  controllerId: "", controllerButton: 0, keyboardKey: "Space",
+  autoCheckUpdates: false
 };
 
 export class SettingsStore {
@@ -71,6 +73,7 @@ function normalize(value: CoachSettings): CoachSettings {
     speakSafety: Boolean(value.speakSafety), speakRace: Boolean(value.speakRace), speakTechnique: Boolean(value.speakTechnique), speakInfo: Boolean(value.speakInfo),
     microphoneDeviceId: String(value.microphoneDeviceId ?? "").slice(0, 300), inputSensitivity: n(value.inputSensitivity, 1, 20, 6),
     controllerId: String(value.controllerId ?? "").slice(0, 300), controllerButton: Math.round(n(value.controllerButton, 0, 63, 0)),
-    keyboardKey: String(value.keyboardKey || "Space").slice(0, 40)
+    keyboardKey: String(value.keyboardKey || "Space").slice(0, 40),
+    autoCheckUpdates: value.autoCheckUpdates === true
   };
 }

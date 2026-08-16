@@ -20,3 +20,27 @@ test("settings persist and clamp unsafe values", async () => {
   assert.equal(spacingFor("quiet"), 12_000);
   await fs.rm(root, { recursive: true, force: true });
 });
+
+
+test("update checks are opt-in and persist when enabled", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "kynolith-update-settings-"));
+  const file = path.join(root, "settings.json");
+
+  const store = new SettingsStore(file);
+  await store.initialize();
+
+  assert.equal(store.get().autoCheckUpdates, false);
+
+  const updated = await store.update({
+    autoCheckUpdates: true
+  });
+
+  assert.equal(updated.autoCheckUpdates, true);
+
+  const reloaded = new SettingsStore(file);
+  await reloaded.initialize();
+
+  assert.equal(reloaded.get().autoCheckUpdates, true);
+
+  await fs.rm(root, { recursive: true, force: true });
+});
