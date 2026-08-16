@@ -53,7 +53,7 @@ Raw telemetry stays local. The language model classifies unfamiliar driver wordi
 ### M2 — first-party LMU live adapter
 
 - Compile bridge against the installed Studio 397 v1.3 header.
-- Map full telemetry and scoring state into `TelemetryFrame` at 20 Hz UI / 100 Hz analysis.
+- Map LMU telemetry and scoring state into `TelemetryFrame` at approximately 67 Hz, then feed accepted frames through the bounded, ordered telemetry pipeline.
 - Detect lifecycle, player index changes, session restarts, and game-version mismatch.
 - Add reconnect/backpressure and recorded JSONL fixtures.
 
