@@ -3,6 +3,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
+const { evaluateBridgeHealth } = require("./bridge-health.cjs");
 
 let coachServer;
 let bridgeProcess;
@@ -55,6 +56,7 @@ function startTelemetryBridge(server) {
     ? path.join(process.resourcesPath, "bridge", "Kynolith.LmuBridge.exe")
     : path.join(app.getAppPath(), "bridge", "publish", "Kynolith.LmuBridge.exe");
   let lastFrameAt = 0;
+  let disconnectReported = false;
   bridgeProcess = spawn(executable, [], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   const lines = readline.createInterface({ input: bridgeProcess.stdout });
   lines.on("line", line => {
@@ -62,14 +64,27 @@ function startTelemetryBridge(server) {
       const frame = JSON.parse(line);
       if (!Number.isFinite(frame.timestamp) || !Number.isFinite(frame.speedKph)) return;
       lastFrameAt = Date.now();
+      disconnectReported = false;
       server.ingestTelemetry(frame);
     } catch { /* Ignore partial or diagnostic output; bridge reconnects independently. */ }
   });
   bridgeProcess.stderr.on("data", chunk => process.stderr.write(`[LMU bridge] ${chunk}`));
   telemetryWatchdog = setInterval(() => {
-    if (lastFrameAt && Date.now() - lastFrameAt > 2500) {
-      lastFrameAt = 0;
+    const health = evaluateBridgeHealth({
+      now: Date.now(),
+      lastFrameAt,
+      disconnectReported
+    });
+
+    if (health.disconnect) {
+      disconnectReported = true;
       server.disconnectTelemetry().catch(() => {});
+    }
+
+    if (health.restart) {
+      console.warn("Telemetry bridge stalled; restarting to self-heal.");
+      clearInterval(telemetryWatchdog);
+      bridgeProcess?.kill();
     }
   }, 1000);
   bridgeProcess.on("exit", () => {
