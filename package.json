@@ -25,7 +25,8 @@
     "desktop": "electron .",
     "dist:win": "pnpm build:bridge && pnpm build && pnpm validate:packaging && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
     "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1",
-    "validate:packaging": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-packaging.ps1"
+    "validate:packaging": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-packaging.ps1",
+    "smoke:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-portable.ps1"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.5-r.1",
