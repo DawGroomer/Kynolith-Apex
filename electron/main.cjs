@@ -1,18 +1,81 @@
-const { app, BrowserWindow, dialog, session } = require("electron");
+const { app, BrowserWindow, dialog, session, shell } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
 const { evaluateBridgeHealth } = require("./bridge-health.cjs");
+const { checkForUpdate } = require("./update-check.cjs");
 
 let coachServer;
 let bridgeProcess;
 let bridgeRestartTimer;
 let telemetryWatchdog;
+let updateCheckTimer;
+let lastPromptedUpdateVersion;
 let quitting = false;
+const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) app.quit();
 
+async function runUpdateCheck(server) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.port}/api/settings`);
+
+    if (!response.ok) {
+      console.warn(`Update setting check failed: ${response.status}`);
+      return;
+    }
+
+    const settings = await response.json();
+
+    const result = await checkForUpdate({
+      enabled: settings.autoCheckUpdates === true,
+      currentVersion: app.getVersion()
+    });
+
+    if (
+      result.status !== "available" ||
+      result.version === lastPromptedUpdateVersion
+    ) {
+      return;
+    }
+
+    lastPromptedUpdateVersion = result.version;
+
+    const choice = await dialog.showMessageBox({
+      type: "info",
+      buttons: ["Open release page", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+      title: "Kynolith Apex update available",
+      message: `Kynolith Apex ${result.version} is available.`,
+      detail: `You are running ${app.getVersion()}. Apex will not download or install the update automatically.`
+    });
+
+    if (choice.response === 0) {
+      await shell.openExternal(result.url);
+    }
+  }
+  catch (error) {
+    console.warn(
+      "Apex update check unavailable:",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+function scheduleUpdateChecks(server) {
+  if (!app.isPackaged) return;
+
+  clearInterval(updateCheckTimer);
+
+  void runUpdateCheck(server);
+
+  updateCheckTimer = setInterval(
+    () => void runUpdateCheck(server),
+    UPDATE_CHECK_INTERVAL
+  );
+}
 async function createWindow() {
   process.env.KYNOLITH_DESKTOP = "1";
   const appRoot = app.getAppPath();
@@ -49,6 +112,7 @@ async function createWindow() {
     }
   });
   await win.loadURL(`http://127.0.0.1:${coachServer.port}`);
+  scheduleUpdateChecks(coachServer);
 }
 
 function startTelemetryBridge(server) {
@@ -104,6 +168,7 @@ app.on("before-quit", () => {
   quitting = true;
   clearTimeout(bridgeRestartTimer);
   clearInterval(telemetryWatchdog);
+  clearInterval(updateCheckTimer);
   bridgeProcess?.kill();
   coachServer?.close().catch(() => {});
 });
