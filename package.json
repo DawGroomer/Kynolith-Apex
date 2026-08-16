@@ -23,8 +23,9 @@
     "build": "tsc",
     "build:bridge": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-bridge.ps1",
     "desktop": "electron .",
-    "dist:win": "pnpm build:bridge && pnpm build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
-    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
+    "dist:win": "pnpm build:bridge && pnpm build && pnpm validate:packaging && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
+    "build:native": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1",
+    "validate:packaging": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-packaging.ps1"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.5-r.1",
