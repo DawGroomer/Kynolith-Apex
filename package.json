@@ -8,8 +8,8 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
     "test": "tsx --test src/*.test.ts",
     "test:soak": "tsx scripts/soak-telemetry.ts --minutes=60",
     "test:soak:accelerated": "tsx scripts/soak-telemetry.ts --minutes=60 --accelerated",

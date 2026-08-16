@@ -389,9 +389,3 @@ function listen(server: Server, port: number): Promise<void> {
     server.listen(port, "127.0.0.1", () => { server.off("error", reject); resolve(); });
   });
 }
-
-if (process.env.KYNOLITH_DESKTOP !== "1") {
-  startCoachServer().then(running => console.log(`Kynolith LMU Coach: http://127.0.0.1:${running.port}`)).catch(error => {
-    console.error(error); process.exitCode = 1;
-  });
-}
