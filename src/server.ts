@@ -171,6 +171,17 @@ app.post("/api/session/stop", async (_req, res) => {
   res.json({ stopped: true, summary });
 });
 app.get("/api/sessions", async (_req, res) => res.json(await recorder.list()));
+app.post("/api/profile/reset", async (_req, res) => {
+  try {
+    await telemetryPipeline.idle();
+    await recorder.clear();
+    cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
+    engine.setCurriculumLevel(cachedAcademy.curriculumLevel);
+    res.sendStatus(204);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unable to reset profile" });
+  }
+});
 app.get("/api/profile", async (_req, res) => res.json(buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get())));
 app.get("/api/calibration", (_req, res) => res.json(calibration.get() ?? { status: "uncalibrated", minimumExpertLabels: MINIMUM_CALIBRATION_LABELS, validatedExpertLabels: 30 }));
 app.post("/api/calibration/import", async (req, res) => {

@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { CoachingCue, RecordedLap, RecordedSession, SessionSummary, TelemetryFrame } from "./types.js";
 import { analyzeLapQuality, applyCorpusQuality, applyCrossSessionBaseline, assessSessionQuality, DATA_QUALITY_VERSION, shouldSplitSession } from "./data-quality.js";
@@ -58,6 +58,15 @@ export class SessionRecorder {
       catch { return null; }
     }));
     return summaries.filter((value): value is SessionSummary => value !== null).sort((a, b) => b.startedAt - a.startedAt);
+  }
+
+  async clear(): Promise<void> {
+    await this.initialize();
+    this.current = null;
+    this.lastRecordedAt = 0;
+    this.lastObserved = null;
+    const files = (await readdir(this.directory)).filter(file => /^session-\d+\.json$/.test(file));
+    await Promise.all(files.map(file => unlink(path.join(this.directory, file))));
   }
 
   async get(id: string): Promise<RecordedSession | null> {
