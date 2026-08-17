@@ -176,10 +176,10 @@ Local speech uses quantized `onnx-community/whisper-tiny.en` for transcription, 
 - Raw high-rate telemetry stays on the local machine.
 - Speech recognition and language routing run locally.
 - Apex does not require an OpenAI or other hosted inference API key.
-- Packaged model files can be staged for offline operation from first launch.
+- Packaged Windows builds require the supported local model bundle and run those models from bundled resources without downloading model weights at runtime.
 - The application does not automate steering, pedals, or pit-menu input.
 
-Development builds download model weights once into the per-user cache. To stage all supported weights before packaging:
+Development builds may download model weights once into the per-user cache. Before packaging, stage the supported model bundle:
 
 ```powershell
 pnpm models:stage
@@ -231,7 +231,7 @@ The build performs the following work:
 1. Publishes the self-contained x64 .NET telemetry bridge
 2. Validates LMU telemetry and scoring structure sizes
 3. Compiles the TypeScript server
-4. Packages the bridge, dashboard, and optional offline models
+4. Packages the bridge, dashboard, and required local model bundle
 5. Writes a portable executable under `release/`
 
 Tagged GitHub builds support Authenticode signing when the Kynolith certificate and password secrets are configured.
@@ -286,7 +286,7 @@ public/          Cockpit dashboard and settings interface
 scripts/         Packaging, migration, reference, and soak tools
 src/             Coaching, telemetry, analysis, voice, and server modules
 test/fixtures/   Sanitized LMU telemetry fixtures
-offline-models/  Optional staged local model assets
+offline-models/  Required local model assets staged for packaging
 ```
 
 ## Third-party acknowledgements
