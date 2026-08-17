@@ -12,3 +12,5 @@ onlyBuiltDependencies:
   - onnxruntime-node
   - protobufjs
   - sharp
+overrides:
+  sharp: 0.35.3
