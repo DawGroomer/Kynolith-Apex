@@ -1,0 +1,343 @@
+:root {
+  --hud-bg: rgba(3, 9, 13, .94);
+  --hud-panel: rgba(7, 17, 22, .88);
+  --hud-panel-strong: rgba(9, 22, 28, .96);
+
+  --hud-line: rgba(49, 206, 229, .20);
+  --hud-line-strong: rgba(49, 206, 229, .58);
+
+  --hud-accent: #31cee5;
+  --hud-value: #f4fbfc;
+  --hud-muted: #799097;
+
+  --hud-throttle: #31cee5;
+  --hud-brake: #e0665c;
+
+  --hud-glow: 0 0 18px rgba(49, 206, 229, .10);
+}
+#hudView[hidden],
+#desktopApp[hidden] {
+  display: none !important;
+}
+
+.header-runtime {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+.hud-enter {
+  white-space: nowrap;
+}
+
+.hud-shell {
+  box-sizing: border-box;
+  min-height: 0;
+  padding: .55rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(49, 206, 229, .025),
+      transparent 24%
+    ),
+    var(--hud-bg);
+  color: var(--hud-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  min-height: 2.45rem;
+  margin-bottom: .45rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--hud-line);
+  border-left: 3px solid var(--hud-accent);
+  background: var(--hud-panel);
+  box-shadow: var(--hud-glow);
+}
+
+.hud-topbar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  width: 18%;
+  height: 1px;
+  background: var(--hud-line-strong);
+}
+
+.hud-topbar > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.hud-topbar .eyebrow {
+  margin: 0;
+}
+
+#hudConnection {
+  font-size: .72rem;
+  opacity: .7;
+}
+
+.hud-exit {
+  flex: 0 0 auto;
+  padding: .45rem .7rem;
+}
+
+.hud-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  align-items: start;
+  gap: .4rem;
+}
+
+.hud-card {
+  position: relative;
+  min-width: 0;
+  padding: .6rem .7rem;
+  overflow: hidden;
+  border: 1px solid var(--hud-line);
+  background: var(--hud-panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.hud-card::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 1px;
+  background: var(--hud-line-strong);
+}
+
+.hud-card > span {
+  display: block;
+  margin-bottom: .35rem;
+  color: var(--hud-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.hud-card > strong {
+  display: block;
+  overflow: hidden;
+  color: var(--hud-value);
+  font-size: clamp(1rem, 5vw, 1.65rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -.035em;
+  text-overflow: ellipsis;
+}
+
+.hud-primary {
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--hud-panel-strong);
+}
+
+.hud-primary > strong {
+  overflow: visible;
+  color: var(--hud-value);
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 900;
+  line-height: .86;
+  letter-spacing: -.07em;
+  text-overflow: clip;
+  text-shadow: 0 0 20px rgba(244, 251, 252, .08);
+}
+
+[data-hud-field="speed"] {
+  border-top: 2px solid var(--hud-line-strong);
+}
+
+[data-hud-field="speed"] > strong {
+  color: var(--hud-value);
+}
+
+[data-hud-field="gear"] {
+  border-top: 2px solid var(--hud-accent);
+}
+
+[data-hud-field="gear"] > strong {
+  color: var(--hud-accent);
+  font-size: clamp(3.2rem, 8vw, 5.5rem);
+}
+
+.hud-primary small {
+  margin-top: .35rem;
+  color: var(--hud-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  opacity: 1;
+}
+
+.hud-cue {
+  grid-column: 1 / -1;
+  min-height: 3.7rem;
+  padding: .55rem .8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 3px solid var(--hud-accent);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(49, 206, 229, .075),
+      transparent 32%
+    ),
+    var(--hud-panel-strong);
+}
+
+.hud-cue > span {
+  margin-bottom: .3rem;
+}
+
+.hud-cue > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--hud-value);
+  font-size: clamp(.95rem, 2vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  white-space: normal;
+  text-overflow: clip;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.hud-input {
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--hud-panel-strong);
+}
+
+.hud-input {
+  min-height: 7.25rem;
+}
+
+.hud-input-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .35rem;
+}
+
+.hud-input-head > span {
+  color: var(--hud-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.hud-input-value {
+  color: var(--hud-value);
+  font-size: .92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hud-pedal-canvas {
+  display: block;
+  width: 100%;
+  height: 4.25rem;
+  border: 1px solid var(--hud-line);
+  background:
+    linear-gradient(
+      rgba(255, 255, 255, .025),
+      rgba(255, 255, 255, 0)
+    ),
+    rgba(0, 0, 0, .28);
+}
+
+body.hud-mode {
+  margin: 0;
+  overflow: auto;
+}
+
+@media (max-width: 720px) {
+  .hud-shell {
+    padding: .4rem;
+  }
+
+  .hud-topbar {
+    padding: .4rem .5rem;
+  }
+
+  .hud-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem;
+  }
+
+  .hud-card {
+    padding: .45rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .hud-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hud-cue {
+    grid-column: auto;
+  }
+}
+.hud-card:not(.hud-primary):not(.hud-input):not(.hud-cue) {
+  min-height: 3.6rem;
+  padding: .55rem .65rem;
+  align-self: start;
+  background: rgba(7, 17, 22, .78);
+}
+
+.hud-card:not(.hud-primary):not(.hud-input):not(.hud-cue) > strong {
+  font-size: clamp(1rem, 2.4vw, 1.45rem);
+  line-height: 1;
+}
+
+[data-hud-field="lap"],
+[data-hud-field="position"],
+[data-hud-field="fuel"],
+[data-hud-field="gap"],
+[data-hud-field="tire"],
+[data-hud-field="pressure"],
+[data-hud-field="rpm"],
+[data-hud-field="source"],
+[data-hud-field="voiceStatus"],
+[data-hud-field="session"] {
+  border-top: 1px solid var(--hud-line-strong);
+}
+@media (max-width: 720px) {
+  .hud-cue {
+    min-height: 3.25rem;
+  }
+
+  .hud-cue > strong {
+    font-size: clamp(.9rem, 3.4vw, 1.15rem);
+  }
+
+  .hud-card:not(.hud-primary):not(.hud-input):not(.hud-cue) {
+    min-height: 3.2rem;
+  }
+}

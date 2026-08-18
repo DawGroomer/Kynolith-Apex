@@ -1,8 +1,166 @@
 const $=id=>document.getElementById(id);let lastCue,lastState,recording,audioContext,sourceNode,processor,micStream,audioChunks=[],settings={},bindingController=false,bindingKeyboard=false,gamepadPressed=false,talkRequestId=0,voiceTurnId=0;const audioMetrics={requested:0,played:0,cancelled:0,dropped:0,failed:0,fallbacks:0,lastLatencyMs:0,maxLatencyMs:0};const audioLanes={coach:{sequence:0,abort:null,audio:null,context:null,url:null,cue:null,playing:false},spotter:{sequence:0,abort:null,audio:null,context:null,url:null,cue:null,playing:false}};window.apexAudioMetrics=audioMetrics;
+let hudModeOverride=null;
+
+
 const socket=new WebSocket(`ws://${location.host}/live`);
 socket.onopen=()=>{$("status").textContent="APEX ONLINE // WAITING FOR LMU"};
-socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;render(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue)speakCue(m.cue)};
+socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;render(m.state);renderHud(m.state);queuePedalGraphRender(m.pedalGraph);applyPresentationMode(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue)speakCue(m.cue)};
 socket.onclose=()=>{$("status").textContent="OFFLINE"};
+
+function shouldUseHud(s){
+  if(hudModeOverride==="hud")return true;
+  if(hudModeOverride==="desktop")return false;
+
+  return Boolean(
+    settings.autoHudMode!==false &&
+    s?.source==="lmu" &&
+    s?.connected===true &&
+    s?.sessionActive===true
+  );
+}
+
+function applyHudFieldVisibility(){
+  const visible=new Set(
+    Array.isArray(settings.hudVisibleFields)
+      ? settings.hudVisibleFields
+      : []
+  );
+
+  document.querySelectorAll("[data-hud-field]").forEach(element=>{
+    element.hidden=!visible.has(element.dataset.hudField);
+  });
+}
+
+const PEDAL_GRAPH_MIN_FRAME_MS=1000/30;
+
+let pendingPedalGraph=null;
+let pedalGraphRenderPending=false;
+let lastPedalGraphRenderAt=-Infinity;
+
+function queuePedalGraphRender(snapshot){
+  pendingPedalGraph=snapshot??null;
+
+  if(pedalGraphRenderPending)return;
+
+  pedalGraphRenderPending=true;
+
+  requestAnimationFrame(
+    flushPedalGraphRender
+  );
+}
+
+function flushPedalGraphRender(now){
+  if(
+    now-lastPedalGraphRenderAt<
+    PEDAL_GRAPH_MIN_FRAME_MS
+  ){
+    requestAnimationFrame(
+      flushPedalGraphRender
+    );
+
+    return;
+  }
+
+  pedalGraphRenderPending=false;
+  lastPedalGraphRenderAt=now;
+
+  const latest=
+    pendingPedalGraph;
+
+  pendingPedalGraph=null;
+
+  if(
+    !window.apexPedalGraph?.draw
+  ){
+    return;
+  }
+
+  window.apexPedalGraph.draw(
+    $("hudThrottleGraph"),
+    latest,
+    "throttle"
+  );
+
+  window.apexPedalGraph.draw(
+    $("hudBrakeGraph"),
+    latest,
+    "brake"
+  );
+}
+function applyPresentationMode(s=lastState){
+  if(!s?.sessionActive && hudModeOverride==="desktop"){
+    hudModeOverride=null;
+  }
+
+  const hud=shouldUseHud(s);
+  const desktop=$("desktopApp");
+  const hudView=$("hudView");
+
+  if(desktop)desktop.hidden=hud;
+  if(hudView)hudView.hidden=!hud;
+
+  document.body.classList.toggle("hud-mode",hud);
+}
+
+function renderHud(s){
+  const f=s?.frame;
+  if(!f)return;
+
+  $("hudSpeed").textContent=Math.round(f.speedKph*.621371);
+  $("hudGear").textContent=f.gear;
+
+  $("hudThrottleValue").textContent=`${Math.round(f.throttle*100)}%`;
+  $("hudBrakeValue").textContent=`${Math.round(f.brake*100)}%`;
+
+  $("hudSession").textContent=f.session.toUpperCase();
+  $("hudLap").textContent=f.lap;
+  $("hudPosition").textContent=`P${f.position} / C${f.classPosition}`;
+
+  $("hudGap").textContent=
+    f.gapAheadSeconds==null
+      ?"—"
+      :`${f.gapAheadSeconds.toFixed(1)} s`;
+
+  $("hudFuel").textContent=
+    `${(f.fuelLiters*.264172).toFixed(1)} gal`;
+
+  $("hudTire").textContent=
+    `${Math.round(Math.max(...f.tireTempC)*1.8+32)} °F`;
+
+  $("hudPressure").textContent=
+    `${average(f.tirePressurePsi).toFixed(1)} PSI`;
+
+  $("hudRpm").textContent=Math.round(f.rpm);
+  $("hudSource").textContent=s.source.toUpperCase();
+
+  $("hudConnection").textContent=
+    s.source==="lmu" && s.connected
+      ? s.sessionActive
+        ?"LMU LIVE"
+        :"LMU CONNECTED"
+      :"WAITING FOR LMU";
+
+  if(s.lastCue){
+    $("hudCue").textContent=s.lastCue.message;
+  }
+
+  const voiceState=$("voiceState")?.textContent;
+  if(voiceState){
+    $("hudVoiceStatus").textContent=voiceState;
+  }
+
+  applyHudFieldVisibility();
+}
+
+$("hudEnter").onclick=()=>{
+  hudModeOverride="hud";
+  applyPresentationMode(lastState);
+};
+
+$("hudExit").onclick=()=>{
+  hudModeOverride="desktop";
+  applyPresentationMode(lastState);
+};
 
 function render(s){const f=s.frame;if(!f)return;$("speed").textContent=Math.round(f.speedKph*.621371);$("gear").textContent=f.gear;$("throttle").style.width=`${f.throttle*100}%`;$("brake").style.width=`${f.brake*100}%`;$("session").textContent=f.session.toUpperCase();$("lap").textContent=f.lap;$("position").textContent=`P${f.position} / C${f.classPosition}`;$("gap").textContent=f.gapAheadSeconds==null?"—":`${f.gapAheadSeconds.toFixed(1)} s`;$("fuel").textContent=`${(f.fuelLiters*.264172).toFixed(1)} gal`;$("tire").textContent=`${Math.round(Math.max(...f.tireTempC)*1.8+32)} °F`;$("pressure").textContent=`${average(f.tirePressurePsi).toFixed(1)} PSI`;$("rpm").textContent=Math.round(f.rpm);$("source").textContent=s.source.toUpperCase();if(s.lastCue)$("cue").textContent=s.lastCue.message}
 
@@ -67,7 +225,7 @@ $("importReference").onclick=async()=>{const file=$("referenceFile").files?.[0];
 const settingIds=["driverName","swearingLevel","voiceEngine","neuralVoice","spotterVoice","voiceName","voiceVolume","voiceRate","voicePitch","speechFrequency","autoSpeak","speakSafety","speakRace","speakTechnique","speakInfo","microphoneDeviceId","inputSensitivity","controllerId","controllerButton","keyboardKey","autoCheckUpdates"];
 window.addEventListener("apex-microphone-selected",event=>{settings.microphoneDeviceId=event.detail?.deviceId||""});
 async function loadSettings(){settings=await fetch("/api/settings").then(readJson);renderSettings();const status=await fetch("/api/local/status").then(readJson);$("sttStatus").textContent=status.speechRecognition;$("modelStatus").textContent=status.coachModel;$("ttsStatus").textContent=status.speechOutput;$("cacheStatus").textContent=status.cacheDirectory;await refreshAudioStatus()}
-function renderSettings(){populateVoices();for(const id of settingIds){const el=$(id);if(!el)continue;if(el.type==="checkbox")el.checked=Boolean(settings[id]);else el.value=settings[id]??""}updateOutputs()}
+function renderSettings(){applyHudFieldVisibility();applyPresentationMode(lastState);applyHudFieldVisibility();applyPresentationMode(lastState);populateVoices();for(const id of settingIds){const el=$(id);if(!el)continue;if(el.type==="checkbox")el.checked=Boolean(settings[id]);else el.value=settings[id]??""}updateOutputs()}
 function collectSettings(){for(const id of settingIds){const el=$(id);if(el.type==="checkbox")settings[id]=el.checked;else if(el.type==="range"||el.type==="number")settings[id]=Number(el.value);else settings[id]=el.value}return settings}
 function updateOutputs(){for(const id of["voiceVolume","voiceRate","voicePitch"])$(`${id}Out`).textContent=$(id).value;$("inputSensitivityOut").textContent=`${$("inputSensitivity").value}x`;$("swearingLevelOut").textContent=["Clean","Edgy","Gruff","Full Send","Rowdy Fan"][Number($("swearingLevel").value)]}
 function populateVoices(){const select=$("voiceName"),current=settings.voiceName||select.value,voices=speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().startsWith("en-us"));select.replaceChildren(new Option("Automatic American voice",""));for(const voice of voices)select.add(new Option(voice.name,voice.name));select.value=current}

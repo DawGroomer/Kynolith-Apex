@@ -12,6 +12,8 @@ import { SettingsStore, spacingFor } from "./settings.js";
 import { buildDriverProfile } from "./driver-profile.js";
 import { analyzeSessionIntelligence } from "./track-intelligence.js";
 import { ReferenceStore } from "./reference-store.js";
+import { PedalGraphModel } from "./pedal-graph.js";
+import { selectPedalReference } from "./pedal-reference.js";
 import { TrackModelStore } from "./track-model-store.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
@@ -71,6 +73,8 @@ let manualStopSawTerminal = false;
 let lastStrongLanguageAt = 0;
 let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
 const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
+const pedalGraph = new PedalGraphModel();
+let pedalGraphSessionKey = "";
 const telemetryPipeline = new BoundedFramePipeline<TelemetryFrame>(12, processFrame, 180);
 const voiceRuntime = new VoiceRuntime(path.join(dataDir, "voice-cache"), request => localAi.synthesize(request.text, request.voice, request.speed, request.role, request.emotion), () => os.freemem() >= 2 * 1024 ** 3);
 const voiceRuntimeStats = { requests: 0, cacheHits: 0, failures: 0, fallbacks: 0, cancellations: 0, drops: 0, lastEngine: "none", lastVoice: "none", lastSynthesisMs: 0, lastQueueDelayMs: 0 };
@@ -149,11 +153,7 @@ app.post("/api/telemetry", (req, res) => {
   res.sendStatus(202);
 });
 app.post("/api/telemetry/disconnect", async (_req, res) => {
-  await telemetryPipeline.idle();
-  state.connected = false;
-  state.source = "simulator";
-  state.sessionActive = false;
-  await recorder.finish();
+  await disconnectTelemetrySession();
   res.sendStatus(204);
 });
 app.get("/api/audio/status", (_req, res) => res.json({
@@ -167,6 +167,10 @@ app.post("/api/session/stop", async (_req, res) => {
   manualStopSawTerminal = false;
   state.sessionActive = false;
   scheduler.clear();
+
+  releasePedalGraphSession();
+  broadcast(null);
+
   const summary = await recorder.finish();
   res.json({ stopped: true, summary });
 });
@@ -267,22 +271,108 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   state.frame = frame;
   const sessionKey = sessionKeyFor(frame);
   const sessionTerminal = (frame.gamePhase ?? 0) >= 8 || (frame.sessionTimeRemainingSeconds === 0 && frame.inPits);
+  const supportedSession = frame.session === "practice" || frame.session === "qualifying" || frame.session === "race";
+
+  const shouldRearm =
+    Boolean(manuallyStoppedSessionKey) &&
+    !sessionTerminal &&
+    supportedSession &&
+    (
+      sessionKey !== manuallyStoppedSessionKey ||
+      manualStopSawTerminal
+    );
+
+  if (shouldRearm) {
+    manuallyStoppedSessionKey = "";
+    manualStopSawTerminal = false;
+  }
+
+  if (
+    !sessionTerminal &&
+    terminalSession
+  ) {
+    terminalSession = false;
+
+    cachedAcademy =
+      buildDriverProfile(
+        settings.get().driverName,
+        await recorder.list(),
+        calibration.get()
+      ).academy;
+  }
+
+  const pedalGraphMayOwnFrame =
+    !manuallyStoppedSessionKey &&
+    !terminalSession;
+
+  if (pedalGraphMayOwnFrame) {
+    const newPedalGraphSession =
+      state.source === "lmu" &&
+      sessionKey !== pedalGraphSessionKey;
+
+    if (newPedalGraphSession) {
+      pedalGraph.reset();
+    }
+
+    pedalGraph.ingest(frame);
+
+    if (newPedalGraphSession) {
+      const [expert, sessions] =
+        await Promise.all([
+          references.matching(
+            frame.track,
+            frame.vehicle
+          ),
+          recorder.comparable(
+            frame.track,
+            frame.vehicle
+          )
+        ]);
+
+      const selectedReference =
+        selectPedalReference({
+          track: frame.track,
+          vehicle: frame.vehicle,
+          sessions,
+          expert
+        });
+
+      if (selectedReference) {
+        pedalGraph.setReference(
+          selectedReference
+        );
+      }
+
+      pedalGraphSessionKey =
+        sessionKey;
+    }
+  }
   if (state.source === "lmu" && sessionTerminal) {
     state.sessionActive = false;
     if (manuallyStoppedSessionKey) manualStopSawTerminal = true;
     if (!terminalCandidateFrames) terminalCandidateSince = frame.timestamp;
     terminalCandidateFrames++;
     const sustainedTerminal = terminalCandidateFrames >= 3 && frame.timestamp - terminalCandidateSince >= 200;
-    if (sustainedTerminal && !terminalSession) { terminalSession = true; scheduler.clear(); await recorder.finish(); welcomedSessionKey = ""; }
+    if (
+      sustainedTerminal &&
+      !terminalSession
+    ) {
+      terminalSession = true;
+      scheduler.clear();
+
+      releasePedalGraphSession();
+
+      await recorder.finish();
+
+      welcomedSessionKey = "";
+    }
     broadcast(null);
     return;
   }
   terminalCandidateSince = 0;
   terminalCandidateFrames = 0;
-  const supportedSession = frame.session === "practice" || frame.session === "qualifying" || frame.session === "race";
-  const shouldRearm = Boolean(manuallyStoppedSessionKey) && supportedSession && (sessionKey !== manuallyStoppedSessionKey || manualStopSawTerminal);
-  if (shouldRearm) { manuallyStoppedSessionKey = ""; manualStopSawTerminal = false; }
-  if (terminalSession) { terminalSession = false; cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy; }
+
+
   if (!supportedSession || manuallyStoppedSessionKey) { state.sessionActive = false; broadcast(null); return; }
   state.sessionActive = state.source === "lmu";
   if (state.source === "lmu") await recorder.recordFrame(frame);
@@ -319,8 +409,29 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
 }
 
 function broadcast(cue: import("./types.js").CoachingCue | null): void {
-  const payload = JSON.stringify({ type: "state", state, cue });
+  const payload = JSON.stringify({ type: "state", state, cue, pedalGraph: pedalGraph.snapshot() });
   for (const client of wss.clients) if (client.readyState === 1) client.send(payload);
+}
+
+function releasePedalGraphSession(): void {
+  pedalGraph.reset();
+  pedalGraphSessionKey = "";
+}
+
+async function disconnectTelemetrySession(): Promise<void> {
+  await telemetryPipeline.idle();
+
+  state.connected = false;
+  state.source = "simulator";
+  state.sessionActive = false;
+
+  releasePedalGraphSession();
+
+  // Publish the ownership transition before yielding to recorder shutdown
+  // or allowing simulator telemetry to become the next graph owner.
+  broadcast(null);
+
+  await recorder.finish();
 }
 
 function sessionKeyFor(frame: TelemetryFrame): string { return `${frame.track}|${frame.vehicle}|${frame.session}`; }
@@ -382,7 +493,7 @@ return {
   port: address.port,
   ingestTelemetry: acceptTelemetry,
   telemetryMetrics: () => telemetryPipeline.snapshot(),
-  disconnectTelemetry: async () => { await telemetryPipeline.idle(); state.connected = false; state.source = "simulator"; state.sessionActive = false; await recorder.finish(); },
+  disconnectTelemetry: disconnectTelemetrySession,
   close: async () => {
     clearInterval(simulatorTimer);
     clearInterval(voicePrewarmTimer);

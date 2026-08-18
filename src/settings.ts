@@ -2,6 +2,52 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export type SpeechFrequency = "quiet" | "balanced" | "active";
+
+export type HudField =
+  | "speed"
+  | "gear"
+  | "throttle"
+  | "brake"
+  | "cue"
+  | "voiceStatus"
+  | "session"
+  | "lap"
+  | "position"
+  | "gap"
+  | "fuel"
+  | "tire"
+  | "pressure"
+  | "rpm"
+  | "source";
+
+export const HUD_FIELDS: readonly HudField[] = [
+  "speed",
+  "gear",
+  "throttle",
+  "brake",
+  "cue",
+  "voiceStatus",
+  "session",
+  "lap",
+  "position",
+  "gap",
+  "fuel",
+  "tire",
+  "pressure",
+  "rpm",
+  "source"
+];
+
+export const defaultHudVisibleFields: HudField[] = [
+  "speed",
+  "gear",
+  "throttle",
+  "brake",
+  "cue",
+  "lap",
+  "position",
+  "fuel"
+];
 export interface CoachSettings {
   driverName: string;
   swearingLevel: number;
@@ -24,6 +70,9 @@ export interface CoachSettings {
   controllerButton: number;
   keyboardKey: string;
   autoCheckUpdates: boolean;
+  autoHudMode: boolean;
+  hudAlwaysOnTop: boolean;
+  hudVisibleFields: HudField[];
 }
 
 export const defaultSettings: CoachSettings = {
@@ -35,7 +84,10 @@ export const defaultSettings: CoachSettings = {
   speakSafety: true, speakRace: true, speakTechnique: true, speakInfo: true,
   microphoneDeviceId: "", inputSensitivity: 6,
   controllerId: "", controllerButton: 0, keyboardKey: "Space",
-  autoCheckUpdates: false
+  autoCheckUpdates: false,
+  autoHudMode: true,
+  hudAlwaysOnTop: false,
+  hudVisibleFields: [...defaultHudVisibleFields]
 };
 
 export class SettingsStore {
@@ -58,6 +110,25 @@ export function spacingFor(frequency: SpeechFrequency): number {
   return { quiet: 12_000, balanced: 6_000, active: 3_500 }[frequency];
 }
 
+function normalizeHudFields(value: unknown): HudField[] {
+  if (!Array.isArray(value)) return [...defaultHudVisibleFields];
+
+  const fields: HudField[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    if (!HUD_FIELDS.includes(item as HudField)) continue;
+
+    const field = item as HudField;
+
+    if (!fields.includes(field)) {
+      fields.push(field);
+    }
+  }
+
+  return fields;
+}
+
 function normalize(value: CoachSettings): CoachSettings {
   const n = (v: unknown, min: number, max: number, fallback: number) => Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Number(v))) : fallback;
   const frequency = ["quiet", "balanced", "active"].includes(value.speechFrequency) ? value.speechFrequency : "balanced";
@@ -74,6 +145,9 @@ function normalize(value: CoachSettings): CoachSettings {
     microphoneDeviceId: String(value.microphoneDeviceId ?? "").slice(0, 300), inputSensitivity: n(value.inputSensitivity, 1, 20, 6),
     controllerId: String(value.controllerId ?? "").slice(0, 300), controllerButton: Math.round(n(value.controllerButton, 0, 63, 0)),
     keyboardKey: String(value.keyboardKey || "Space").slice(0, 40),
-    autoCheckUpdates: value.autoCheckUpdates === true
+    autoCheckUpdates: value.autoCheckUpdates === true,
+    autoHudMode: value.autoHudMode !== false,
+    hudAlwaysOnTop: value.hudAlwaysOnTop === true,
+    hudVisibleFields: normalizeHudFields(value.hudVisibleFields)
   };
 }
