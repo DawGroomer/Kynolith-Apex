@@ -35,13 +35,15 @@ export interface PedalWindowDiagnosis {
 
 export function diagnosePedalWindow(
   actualFrames: TelemetryFrame[],
-  reference: PedalReferenceInput
+  reference: PedalReferenceInput | null
 ): PedalWindowDiagnosis {
   const timing =
-    assessPedalTiming(
-      actualFrames,
-      reference
-    );
+    reference === null
+      ? noReferenceTiming()
+      : assessPedalTiming(
+          actualFrames,
+          reference
+        );
 
   const shape =
     assessPedalShape(
@@ -64,7 +66,7 @@ export function diagnosePedalWindow(
 
 export function diagnosePedalCorner(
   actualFrames: TelemetryFrame[],
-  reference: PedalReferenceInput,
+  reference: PedalReferenceInput | null,
   corner: TrackCorner
 ): PedalWindowDiagnosis {
   const withinCorner = (
@@ -76,13 +78,17 @@ export function diagnosePedalCorner(
   const actualWindow =
     actualFrames.filter(withinCorner);
 
-  const referenceWindow: PedalReferenceInput = {
-    ...reference,
-    frames:
-      reference.frames.filter(
-        withinCorner
-      )
-  };
+  const referenceWindow:
+    PedalReferenceInput | null =
+      reference === null
+        ? null
+        : {
+            ...reference,
+            frames:
+              reference.frames.filter(
+                withinCorner
+              )
+          };
 
   if (
     !hasSingleActualOwnership(
@@ -96,19 +102,36 @@ export function diagnosePedalCorner(
   }
 
   const ownedReference =
-    hasSingleReferenceOwnership(
-      referenceWindow
-    )
-      ? referenceWindow
-      : {
-          ...referenceWindow,
-          frames: []
-        };
+    referenceWindow === null
+      ? null
+      : hasSingleReferenceOwnership(
+          referenceWindow
+        )
+        ? referenceWindow
+        : {
+            ...referenceWindow,
+            frames: []
+          };
 
   return diagnosePedalWindow(
     actualWindow,
     ownedReference
   );
+}
+
+
+function noReferenceTiming(): PedalTimingAssessment {
+  return {
+    state: "actual-only",
+
+    brakeRelease: {
+      status: "unavailable"
+    },
+
+    throttlePickup: {
+      status: "unavailable"
+    }
+  };
 }
 
 

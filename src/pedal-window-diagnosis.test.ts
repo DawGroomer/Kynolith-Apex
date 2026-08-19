@@ -382,3 +382,86 @@ test(
     );
   }
 );
+
+test(
+  "preserves intrinsic telemetry findings when no trusted reference exists",
+  async () => {
+    const {
+      diagnosePedalCorner
+    } = await import(
+      "./pedal-window-diagnosis.js"
+    );
+
+    const corner = {
+      id: "fuji-t1",
+      name: "Turn 1",
+      entry: 0.14,
+      apex: 0.18,
+      exit: 0.24
+    };
+
+    const actual =
+      trace(
+        0.18,
+        0.28,
+        20_000
+      );
+
+    const before =
+      JSON.stringify(
+        actual
+      );
+
+    const result =
+      diagnosePedalCorner(
+        actual,
+        null,
+        corner
+      );
+
+    assert.equal(
+      result.timing.state,
+      "actual-only"
+    );
+
+    assert.equal(
+      result.timing.brakeRelease.status,
+      "unavailable"
+    );
+
+    assert.equal(
+      result.timing.throttlePickup.status,
+      "unavailable"
+    );
+
+    assert.notEqual(
+      result.shape.brakeRelease.status,
+      "unavailable"
+    );
+
+    assert.equal(
+      result.findings.some(
+        finding =>
+          finding.provenance ===
+          "telemetry"
+      ),
+      true
+    );
+
+    assert.equal(
+      result.findings.some(
+        finding =>
+          finding.provenance ===
+          "trusted-reference"
+      ),
+      false
+    );
+
+    assert.equal(
+      JSON.stringify(
+        actual
+      ),
+      before
+    );
+  }
+);
