@@ -31,7 +31,18 @@ export class ReferenceStore {
     const vehicle = String(source.vehicle ?? source.summary?.vehicle ?? frames[0]?.vehicle ?? "").trim().slice(0, 160);
     if (!track) throw new Error("Reference track is missing");
     const requestedLap = fastestCompleteLap(source as RecordedSession, frames);
-    const lapFrames = requestedLap == null ? frames : frames.filter(frame => frame.lap === requestedLap);
+    if (requestedLap == null) throw new Error("Reference must contain a single complete lap");
+
+    const lapFrames = frames.filter(frame => frame.lap === requestedLap);
+
+    if (lapFrames.some(frame => frame.track !== track)) {
+      throw new Error("Reference selected lap contains mixed track identity");
+    }
+
+    if (lapFrames.some(frame => frame.vehicle !== vehicle)) {
+      throw new Error("Reference selected lap contains mixed vehicle identity");
+    }
+
     const lapTimeSeconds = lapFrames.length > 1 ? (lapFrames.at(-1)!.timestamp - lapFrames[0]!.timestamp) / 1000 : null;
     const importedAt = Date.now(), id = `reference-${importedAt.toString(36)}`;
     const provenance = source.provenance && typeof source.provenance === "object" ? source.provenance : undefined;
