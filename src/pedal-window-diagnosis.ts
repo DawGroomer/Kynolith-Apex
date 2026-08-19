@@ -84,22 +84,73 @@ export function diagnosePedalCorner(
       )
   };
 
-  const actualLaps =
-    new Set(
-      actualWindow.map(
-        frame => frame.lap
-      )
-    );
-
-  if (actualLaps.size !== 1) {
+  if (
+    !hasSingleActualOwnership(
+      actualWindow
+    )
+  ) {
     return diagnosePedalWindow(
       [],
       referenceWindow
     );
   }
 
+  const ownedReference =
+    hasSingleReferenceOwnership(
+      referenceWindow
+    )
+      ? referenceWindow
+      : {
+          ...referenceWindow,
+          frames: []
+        };
+
   return diagnosePedalWindow(
     actualWindow,
-    referenceWindow
+    ownedReference
+  );
+}
+
+
+function hasSingleActualOwnership(
+  frames: TelemetryFrame[]
+): boolean {
+  const first =
+    frames[0];
+
+  if (!first) {
+    return false;
+  }
+
+  return frames.every(
+    frame =>
+      frame.track === first.track &&
+      frame.vehicle === first.vehicle &&
+      frame.session === first.session &&
+      frame.lap === first.lap
+  );
+}
+
+
+function hasSingleReferenceOwnership(
+  reference: PedalReferenceInput
+): boolean {
+  const first =
+    reference.frames[0];
+
+  if (
+    !first ||
+    !Number.isFinite(
+      first.lap
+    )
+  ) {
+    return false;
+  }
+
+  return reference.frames.every(
+    frame =>
+      frame.track === reference.track &&
+      frame.vehicle === reference.vehicle &&
+      frame.lap === first.lap
   );
 }

@@ -70,6 +70,10 @@ export function assessSessionQuality(laps: RecordedLap[], frames: TelemetryFrame
 }
 
 export function shouldSplitSession(previous: TelemetryFrame, next: TelemetryFrame): string | null {
+  if (next.track !== previous.track) return "Track identity changed";
+  if (next.vehicle !== previous.vehicle) return "Vehicle identity changed";
+  if (next.session !== previous.session) return "Session identity changed";
+
   const gap = next.timestamp - previous.timestamp;
   if (gap < -1_000) return "Telemetry timestamp reset";
   if (gap > 5_000) return "Telemetry gap exceeded five seconds";

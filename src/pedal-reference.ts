@@ -73,6 +73,25 @@ function selectExpertReference(
   }
 
 
+  const referenceLap =
+    expert.frames[0]!.lap;
+
+
+  if (
+    !Number.isFinite(
+      referenceLap
+    ) ||
+    expert.frames.some(
+      frame =>
+        frame.track !== track ||
+        frame.vehicle !== vehicle ||
+        frame.lap !== referenceLap
+    )
+  ) {
+    return null;
+  }
+
+
   const source =
     expert.benchmark?.type ===
     "mylmu-community-benchmark"
