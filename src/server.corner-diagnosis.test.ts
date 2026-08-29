@@ -881,6 +881,227 @@ test(
 
 
 test(
+  "profile reset clears completed corner diagnosis history and rearms C5C",
+  async () => {
+    const previousDesktop =
+      process.env.KYNOLITH_DESKTOP;
+
+    process.env.KYNOLITH_DESKTOP =
+      "1";
+
+    const dataDir =
+      await mkdtemp(
+        path.join(
+          os.tmpdir(),
+          "apex-corner-diagnosis-profile-reset-history-"
+        )
+      );
+
+    await mkdir(
+      path.join(dataDir, "track-models"),
+      { recursive: true }
+    );
+
+    await writeFile(
+      path.join(
+        dataDir,
+        "track-models",
+        "profile-reset-history-track.json"
+      ),
+      JSON.stringify({
+        track: "Profile Reset History Track",
+        version: 1,
+        source: "learned",
+        corners: [
+          {
+            id: "profile-reset-history-t1",
+            name: "Profile Reset History Turn 1",
+            entry: 0.10,
+            apex: 0.15,
+            exit: 0.20
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    const { startCoachServer } =
+      await import("./server.js");
+
+    const running =
+      await startCoachServer({
+        port: 0,
+        publicDir: path.resolve("public"),
+        dataDir,
+        allowModelDownloads: false,
+        prewarmVoices: false
+      });
+
+    const socket =
+      new WebSocket(
+        `ws://127.0.0.1:${running.port}/live`
+      );
+
+    const frame = (
+      lap: number,
+      lapDistance: number,
+      timestamp: number
+    ) => ({
+      ...simulatedFrame(timestamp),
+      track: "Profile Reset History Track",
+      vehicle: "Profile Reset History Car",
+      session: "practice" as const,
+      lap,
+      lapDistance,
+      gamePhase: 5,
+      sessionTimeRemainingSeconds: 300,
+      brake:
+        lapDistance <= 0.14
+          ? 0.8
+          : 0.2,
+      throttle:
+        lapDistance >= 0.16
+          ? 0.6
+          : 0,
+      steering:
+        lapDistance >= 0.10 &&
+        lapDistance <= 0.20
+          ? 0.25
+          : 0.02
+    });
+
+    const evidence = [
+      [0.09, 42_000],
+      [0.10, 42_100],
+      [0.12, 42_200],
+      [0.14, 42_300],
+      [0.16, 42_400],
+      [0.18, 42_500],
+      [0.20, 42_600],
+      [0.21, 42_700]
+    ] as const;
+
+    try {
+      await waitForOpen(socket);
+
+      for (
+        const [distance, timestamp]
+        of evidence
+      ) {
+        const processed =
+          waitForTimestamp(
+            socket,
+            timestamp
+          );
+
+        assert.equal(
+          running.ingestTelemetry(
+            frame(2, distance, timestamp)
+          ),
+          true
+        );
+
+        await processed;
+      }
+
+      assert.equal(
+        running.cornerDiagnoses()
+          .length,
+        1
+      );
+
+      const reset =
+        await fetch(
+          "http://127.0.0.1:" +
+            running.port +
+            "/api/profile/reset",
+          { method: "POST" }
+        );
+
+      assert.equal(
+        reset.status,
+        204
+      );
+
+      assert.deepEqual(
+        running.cornerDiagnoses(),
+        []
+      );
+
+      for (
+        const [distance, timestamp]
+        of evidence
+      ) {
+        const processed =
+          waitForTimestamp(
+            socket,
+            timestamp + 1_000
+          );
+
+        assert.equal(
+          running.ingestTelemetry(
+            frame(3, distance, timestamp + 1_000)
+          ),
+          true
+        );
+
+        await processed;
+      }
+
+      const history =
+        running.cornerDiagnoses();
+
+      assert.equal(
+        history.length,
+        1
+      );
+
+      assert.equal(
+        history[0]!.lap,
+        3
+      );
+
+      assert.equal(
+        history[0]!.corner.id,
+        "profile-reset-history-t1"
+      );
+    }
+    finally {
+      if (
+        socket.readyState !==
+        WebSocket.CLOSED
+      ) {
+        socket.terminate();
+      }
+
+      await running.close();
+
+      await rm(
+        dataDir,
+        {
+          recursive: true,
+          force: true
+        }
+      );
+
+      if (
+        previousDesktop ===
+        undefined
+      ) {
+        delete process.env
+          .KYNOLITH_DESKTOP;
+      }
+      else {
+        process.env
+          .KYNOLITH_DESKTOP =
+          previousDesktop;
+      }
+    }
+  }
+);
+
+
+test(
   "disconnect prevents incomplete corner diagnosis leakage",
   async () => {
     const previousDesktop =

@@ -434,3 +434,454 @@ test(
     }
   }
 );
+
+
+test(
+  "malformed persisted JSON fails closed",
+  async () => {
+    const directory =
+      await mkdtemp(
+        path.join(
+          os.tmpdir(),
+          "apex-track-model-malformed-json-"
+        )
+      );
+
+    try {
+      await writeFile(
+        path.join(
+          directory,
+          "malformed-persisted-circuit.json"
+        ),
+        "{ not valid JSON",
+        "utf8"
+      );
+
+      const store =
+        new TrackModelStore(
+          directory
+        );
+
+      assert.equal(
+        await store.matching(
+          "Malformed Persisted Circuit"
+        ),
+        null
+      );
+    }
+    finally {
+      await rm(
+        directory,
+        {
+          recursive: true,
+          force: true
+        }
+      );
+    }
+  }
+);
+
+
+test(
+  "structurally malformed persisted models fail closed",
+  async () => {
+    const directory =
+      await mkdtemp(
+        path.join(
+          os.tmpdir(),
+          "apex-track-model-structural-invalid-"
+        )
+      );
+
+    const file =
+      path.join(
+        directory,
+        "structural-invalid-circuit.json"
+      );
+
+    const validCorner = {
+      id: "structural-c1",
+      name: "Structural Corner",
+      entry: 0.10,
+      apex: 0.15,
+      exit: 0.20
+    };
+
+    const validModel = {
+      track: "Structural Invalid Circuit",
+      version: 1,
+      source: "learned",
+      corners: [validCorner]
+    };
+
+    const cases: Array<[
+      string,
+      Record<string, unknown>
+    ]> = [
+      [
+        "missing corners",
+        {
+          track: validModel.track,
+          version: validModel.version,
+          source: validModel.source
+        }
+      ],
+      [
+        "corners not an array",
+        {
+          ...validModel,
+          corners: {}
+        }
+      ],
+      [
+        "missing corner id",
+        {
+          ...validModel,
+          corners: [{
+            name: validCorner.name,
+            entry: validCorner.entry,
+            apex: validCorner.apex,
+            exit: validCorner.exit
+          }]
+        }
+      ],
+      [
+        "missing corner name",
+        {
+          ...validModel,
+          corners: [{
+            id: validCorner.id,
+            entry: validCorner.entry,
+            apex: validCorner.apex,
+            exit: validCorner.exit
+          }]
+        }
+      ],
+      [
+        "missing entry",
+        {
+          ...validModel,
+          corners: [{
+            id: validCorner.id,
+            name: validCorner.name,
+            apex: validCorner.apex,
+            exit: validCorner.exit
+          }]
+        }
+      ],
+      [
+        "missing apex",
+        {
+          ...validModel,
+          corners: [{
+            id: validCorner.id,
+            name: validCorner.name,
+            entry: validCorner.entry,
+            exit: validCorner.exit
+          }]
+        }
+      ],
+      [
+        "missing exit",
+        {
+          ...validModel,
+          corners: [{
+            id: validCorner.id,
+            name: validCorner.name,
+            entry: validCorner.entry,
+            apex: validCorner.apex
+          }]
+        }
+      ],
+      [
+        "string geometry",
+        {
+          ...validModel,
+          corners: [{
+            ...validCorner,
+            entry: "0.10"
+          }]
+        }
+      ],
+      [
+        "boolean geometry",
+        {
+          ...validModel,
+          corners: [{
+            ...validCorner,
+            apex: true
+          }]
+        }
+      ],
+      [
+        "null geometry",
+        {
+          ...validModel,
+          corners: [{
+            ...validCorner,
+            exit: null
+          }]
+        }
+      ],
+      [
+        "missing track",
+        {
+          version: validModel.version,
+          source: validModel.source,
+          corners: validModel.corners
+        }
+      ],
+      [
+        "invalid track",
+        {
+          ...validModel,
+          track: 42
+        }
+      ],
+      [
+        "missing version",
+        {
+          track: validModel.track,
+          source: validModel.source,
+          corners: validModel.corners
+        }
+      ],
+      [
+        "invalid version",
+        {
+          ...validModel,
+          version: "1"
+        }
+      ],
+      [
+        "invalid source",
+        {
+          ...validModel,
+          source: "generated"
+        }
+      ]
+    ];
+
+    try {
+      const store =
+        new TrackModelStore(
+          directory
+        );
+
+      const results: unknown[] = [];
+
+      for (
+        const [, model]
+        of cases
+      ) {
+        await writeFile(
+          file,
+          JSON.stringify(model),
+          "utf8"
+        );
+
+        results.push(
+          await store.matching(
+            "Structural Invalid Circuit"
+          )
+        );
+      }
+
+      assert.deepEqual(
+        results,
+        cases.map(() => null)
+      );
+    }
+    finally {
+      await rm(
+        directory,
+        {
+          recursive: true,
+          force: true
+        }
+      );
+    }
+  }
+);
+
+
+test(
+  "semantically invalid persisted geometry fails closed",
+  async () => {
+    const directory =
+      await mkdtemp(
+        path.join(
+          os.tmpdir(),
+          "apex-track-model-semantic-invalid-"
+        )
+      );
+
+    const file =
+      path.join(
+        directory,
+        "semantic-invalid-circuit.json"
+      );
+
+    const model = (
+      entry: unknown,
+      apex: unknown,
+      exit: unknown
+    ) => ({
+      track: "Semantic Invalid Circuit",
+      version: 1,
+      source: "learned",
+      corners: [
+        {
+          id: "semantic-c1",
+          name: "Semantic Corner",
+          entry,
+          apex,
+          exit
+        }
+      ]
+    });
+
+    const cases: Array<[
+      string,
+      string
+    ]> = [
+      [
+        "non-finite overflow",
+        '{"track":"Semantic Invalid Circuit","version":1,"source":"learned","corners":[{"id":"semantic-c1","name":"Semantic Corner","entry":0.1,"apex":0.15,"exit":1e309}]}'
+      ],
+      [
+        "entry below zero",
+        JSON.stringify(model(-0.01, 0.15, 0.20))
+      ],
+      [
+        "apex below zero",
+        JSON.stringify(model(0.10, -0.01, 0.20))
+      ],
+      [
+        "exit below zero",
+        JSON.stringify(model(0.10, 0.15, -0.01))
+      ],
+      [
+        "entry above one",
+        JSON.stringify(model(1.01, 1.02, 1.03))
+      ],
+      [
+        "apex above one",
+        JSON.stringify(model(0.90, 1.01, 1.02))
+      ],
+      [
+        "exit above one",
+        JSON.stringify(model(0.90, 0.95, 1.01))
+      ],
+      [
+        "entry greater than apex",
+        JSON.stringify(model(0.20, 0.15, 0.30))
+      ],
+      [
+        "apex greater than exit",
+        JSON.stringify(model(0.10, 0.25, 0.20))
+      ]
+    ];
+
+    try {
+      const store =
+        new TrackModelStore(
+          directory
+        );
+
+      const results: unknown[] = [];
+
+      for (
+        const [, json]
+        of cases
+      ) {
+        await writeFile(
+          file,
+          json,
+          "utf8"
+        );
+
+        results.push(
+          await store.matching(
+            "Semantic Invalid Circuit"
+          )
+        );
+      }
+
+      assert.deepEqual(
+        results,
+        cases.map(() => null)
+      );
+    }
+    finally {
+      await rm(
+        directory,
+        {
+          recursive: true,
+          force: true
+        }
+      );
+    }
+  }
+);
+
+
+test(
+  "accepts normalized boundary corner geometry",
+  async () => {
+    const directory =
+      await mkdtemp(
+        path.join(
+          os.tmpdir(),
+          "apex-track-model-boundary-"
+        )
+      );
+
+    try {
+      const persisted = {
+        track: "Boundary Circuit",
+        version: 1,
+        source: "learned",
+        corners: [
+          {
+            id: "boundary-c1",
+            name: "Boundary Corner",
+            entry: 0,
+            apex: 0.50,
+            exit: 1
+          }
+        ]
+      };
+
+      await writeFile(
+        path.join(
+          directory,
+          "boundary-circuit.json"
+        ),
+        JSON.stringify(persisted),
+        "utf8"
+      );
+
+      const store =
+        new TrackModelStore(
+          directory
+        );
+
+      assert.deepEqual(
+        await store.matching(
+          "Boundary Circuit"
+        ),
+        persisted
+      );
+    }
+    finally {
+      await rm(
+        directory,
+        {
+          recursive: true,
+          force: true
+        }
+      );
+    }
+  }
+);

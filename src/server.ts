@@ -187,6 +187,7 @@ app.post("/api/profile/reset", async (_req, res) => {
     releasePedalGraphSession();
     cornerDiagnosisAuthority.reset();
     cornerDiagnosisSessionKey = "";
+    cornerDiagnosisHistory.length = 0;
 
     await recorder.clear();
     cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;

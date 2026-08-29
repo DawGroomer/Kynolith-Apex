@@ -18,9 +18,14 @@ export class TrackModelStore {
       );
 
     try {
-      return JSON.parse(
+      const parsed: unknown =
+        JSON.parse(
         await readFile(file, "utf8")
-      ) as TrackModel;
+        );
+
+      return isValidTrackModel(parsed)
+        ? parsed
+        : null;
     }
     catch {
       return null;
@@ -94,3 +99,57 @@ function mergeZones(zones: Array<{ start: number; end: number; peak: TelemetryFr
 }
 function slug(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "unknown-track"; }
 function round(value: number): number { return Math.round(value * 10_000) / 10_000; }
+
+function isValidTrackModel(
+  value: unknown
+): value is TrackModel {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const model =
+    value as Record<string, unknown>;
+
+  if (
+    typeof model.track !== "string" ||
+    typeof model.version !== "number" ||
+    !Number.isFinite(model.version) ||
+    (model.source !== "curated" &&
+      model.source !== "learned") ||
+    !Array.isArray(model.corners)
+  ) {
+    return false;
+  }
+
+  return model.corners.every(
+    corner => {
+      if (
+        typeof corner !== "object" ||
+        corner === null
+      ) {
+        return false;
+      }
+
+      const item =
+        corner as Record<string, unknown>;
+
+      return (
+        typeof item.id === "string" &&
+        typeof item.name === "string" &&
+        typeof item.entry === "number" &&
+        typeof item.apex === "number" &&
+        typeof item.exit === "number" &&
+        Number.isFinite(item.entry) &&
+        Number.isFinite(item.apex) &&
+        Number.isFinite(item.exit) &&
+        item.entry >= 0 &&
+        item.entry <= item.apex &&
+        item.apex <= item.exit &&
+        item.exit <= 1
+      );
+    }
+  );
+}
