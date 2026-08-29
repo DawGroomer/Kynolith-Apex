@@ -92,6 +92,60 @@ export class CornerDiagnosisAuthority {
       const first =
         active.frames[0];
 
+      const completesAtLapBoundary =
+        first &&
+        first.track ===
+          frame.track &&
+        first.vehicle ===
+          frame.vehicle &&
+        first.session ===
+          frame.session &&
+        active.corner.exit ===
+          1 &&
+        frame.lap ===
+          first.lap + 1 &&
+        frame.lapDistance <
+          active.corner.entry &&
+        active.frames.some(
+          evidence =>
+            evidence.lapDistance >
+            active.corner.apex
+        );
+
+      if (completesAtLapBoundary) {
+        this.active.delete(
+          cornerId
+        );
+
+        this.completedIdentities.add(
+          completionIdentity(
+            first,
+            active.corner
+          )
+        );
+
+        completed.push({
+          track: first.track,
+          vehicle: first.vehicle,
+          session: first.session,
+          lap: first.lap,
+
+          corner: active.corner,
+
+          completedAt:
+            frame.timestamp,
+
+          diagnosis:
+            diagnosePedalCorner(
+              active.frames,
+              configuration.reference,
+              active.corner
+            )
+        });
+
+        continue;
+      }
+
       if (
         first &&
         !sameEvidenceOwner(

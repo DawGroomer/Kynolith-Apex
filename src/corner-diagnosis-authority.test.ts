@@ -341,6 +341,148 @@ test(
 );
 
 test(
+  "completes an end-of-lap corner at the next-lap boundary without mixing evidence",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    const endOfLapModel: TrackModel = {
+      track: "Test Track",
+      version: 1,
+      source: "learned",
+      corners: [
+        {
+          id: "end-of-lap-t1",
+          name: "End-of-Lap Turn 1",
+          entry: 0.10,
+          apex: 0.50,
+          exit: 1
+        }
+      ]
+    };
+
+    authority.configure({
+      model: endOfLapModel,
+      reference: null
+    });
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.09, 13_000, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.10, 13_100, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.50, 13_200, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.99, 13_900, { lap: 2 })
+      ),
+      []
+    );
+
+    const completed =
+      authority.ingest(
+        frame(0.01, 14_000, { lap: 3 })
+      );
+
+    assert.equal(
+      completed.length,
+      1
+    );
+
+    assert.equal(
+      completed[0]!.lap,
+      2
+    );
+
+    assert.equal(
+      completed[0]!.completedAt,
+      14_000
+    );
+  }
+);
+
+test(
+  "does not complete an end-of-lap corner without post-apex evidence",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    authority.configure({
+      model: {
+        track: "Test Track",
+        version: 1,
+        source: "learned",
+        corners: [
+          {
+            id: "end-of-lap-guard-t1",
+            name: "End-of-Lap Guard Turn 1",
+            entry: 0.10,
+            apex: 0.50,
+            exit: 1
+          }
+        ]
+      },
+      reference: null
+    });
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.09, 15_000, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.10, 15_100, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.50, 15_200, { lap: 2 })
+      ),
+      []
+    );
+
+    assert.deepEqual(
+      authority.ingest(
+        frame(0.01, 16_000, { lap: 3 })
+      ),
+      []
+    );
+  }
+);
+
+test(
   "discards incomplete corner evidence when telemetry ownership changes",
   async () => {
     const {
