@@ -104,8 +104,26 @@ export class CornerDiagnosisAuthority {
           1 &&
         frame.lap ===
           first.lap + 1 &&
-        frame.lapDistance <
-          active.corner.entry &&
+        (
+          frame.lapDistance <
+            active.corner.entry ||
+          (
+            active.corner.entry ===
+              0 &&
+            this.previousFrame !==
+              null &&
+            this.previousFrame.track ===
+              frame.track &&
+            this.previousFrame.vehicle ===
+              frame.vehicle &&
+            this.previousFrame.session ===
+              frame.session &&
+            frame.lap ===
+              this.previousFrame.lap + 1 &&
+            frame.lapDistance <
+              this.previousFrame.lapDistance
+          )
+        ) &&
         active.frames.some(
           evidence =>
             evidence.lapDistance >

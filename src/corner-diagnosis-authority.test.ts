@@ -1308,3 +1308,125 @@ test(
     );
   }
 );
+
+
+test(
+  "entry-zero exit-one corner completes at the next lap boundary",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    authority.configure({
+      model: {
+        ...model,
+        corners: [
+          {
+            id: "entry-zero-exit-one-t1",
+            name: "Entry Zero Exit One Turn 1",
+            entry: 0,
+            apex: 0.50,
+            exit: 1
+          }
+        ]
+      },
+      reference: null
+    });
+
+    const completed: unknown[] = [];
+
+    for (
+      const item of [
+        frame(0.99, 16_000, { lap: 2 }),
+        frame(0.01, 17_000, { lap: 3 }),
+        frame(0.10, 17_100, { lap: 3 }),
+        frame(0.50, 17_200, { lap: 3 }),
+        frame(0.80, 17_300, { lap: 3 }),
+        frame(0.99, 17_400, { lap: 3 }),
+        frame(0.01, 18_000, { lap: 4 })
+      ]
+    ) {
+      completed.push(
+        ...authority.ingest(item)
+      );
+    }
+
+    assert.equal(
+      completed.length,
+      1
+    );
+
+    const result =
+      completed[0] as {
+        lap: number;
+        completedAt: number;
+      };
+
+    assert.equal(
+      result.lap,
+      3
+    );
+
+    assert.equal(
+      result.completedAt,
+      18_000
+    );
+  }
+);
+
+
+test(
+  "entry-zero exit-one corner fails closed without post-apex evidence",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    authority.configure({
+      model: {
+        ...model,
+        corners: [
+          {
+            id: "entry-zero-exit-one-guard-t1",
+            name: "Entry Zero Exit One Guard Turn 1",
+            entry: 0,
+            apex: 0.50,
+            exit: 1
+          }
+        ]
+      },
+      reference: null
+    });
+
+    const completed: unknown[] = [];
+
+    for (
+      const item of [
+        frame(0.99, 19_000, { lap: 2 }),
+        frame(0.01, 20_000, { lap: 3 }),
+        frame(0.10, 20_100, { lap: 3 }),
+        frame(0.50, 20_200, { lap: 3 }),
+        frame(0.01, 21_000, { lap: 4 })
+      ]
+    ) {
+      completed.push(
+        ...authority.ingest(item)
+      );
+    }
+
+    assert.deepEqual(
+      completed,
+      []
+    );
+  }
+);
