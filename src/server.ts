@@ -15,6 +15,7 @@ import { ReferenceStore } from "./reference-store.js";
 import { PedalGraphModel } from "./pedal-graph.js";
 import { selectPedalReference } from "./pedal-reference.js";
 import { TrackModelStore } from "./track-model-store.js";
+import { CornerDiagnosisAuthority, type CompletedCornerDiagnosis } from "./corner-diagnosis-authority.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
 import { MINIMUM_CALIBRATION_LABELS, ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
@@ -37,6 +38,7 @@ export interface RunningCoachServer {
   ingestTelemetry: (frame: TelemetryFrame) => boolean;
   disconnectTelemetry: () => Promise<void>;
   telemetryMetrics: () => PipelineMetrics;
+  cornerDiagnoses: () => CompletedCornerDiagnosis[];
   close: () => Promise<void>;
 }
 
@@ -72,6 +74,9 @@ let manuallyStoppedSessionKey = "";
 let manualStopSawTerminal = false;
 let lastStrongLanguageAt = 0;
 let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
+const cornerDiagnosisHistory: CompletedCornerDiagnosis[] = [];
+const cornerDiagnosisAuthority = new CornerDiagnosisAuthority();
+let cornerDiagnosisSessionKey = "";
 const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
 const pedalGraph = new PedalGraphModel();
 let pedalGraphSessionKey = "";
@@ -178,6 +183,11 @@ app.get("/api/sessions", async (_req, res) => res.json(await recorder.list()));
 app.post("/api/profile/reset", async (_req, res) => {
   try {
     await telemetryPipeline.idle();
+
+    releasePedalGraphSession();
+    cornerDiagnosisAuthority.reset();
+    cornerDiagnosisSessionKey = "";
+
     await recorder.clear();
     cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
     engine.setCurriculumLevel(cachedAcademy.curriculumLevel);
@@ -304,6 +314,10 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
   const pedalGraphMayOwnFrame =
     !manuallyStoppedSessionKey &&
     !terminalSession;
+  const cornerDiagnosisMayOwnFrame =
+    supportedSession &&
+    pedalGraphMayOwnFrame &&
+    !sessionTerminal;
 
   if (pedalGraphMayOwnFrame) {
     const newPedalGraphSession =
@@ -317,7 +331,7 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
     pedalGraph.ingest(frame);
 
     if (newPedalGraphSession) {
-      const [expert, sessions] =
+      const [expert, sessions, model] =
         await Promise.all([
           references.matching(
             frame.track,
@@ -326,6 +340,9 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
           recorder.comparable(
             frame.track,
             frame.vehicle
+          ),
+          trackModels.matching(
+            frame.track
           )
         ]);
 
@@ -343,10 +360,52 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
         );
       }
 
+      if (model) {
+        cornerDiagnosisAuthority.configure({
+          model,
+          reference: selectedReference
+        });
+
+        cornerDiagnosisSessionKey =
+          sessionKey;
+      }
+      else {
+        cornerDiagnosisAuthority.reset();
+        cornerDiagnosisSessionKey = "";
+      }
+
       pedalGraphSessionKey =
         sessionKey;
     }
   }
+  if (
+    cornerDiagnosisMayOwnFrame &&
+    cornerDiagnosisSessionKey ===
+      sessionKey
+  ) {
+    const completed =
+      cornerDiagnosisAuthority.ingest(
+        frame
+      );
+
+    if (completed.length) {
+      cornerDiagnosisHistory.push(
+        ...completed
+      );
+
+      if (
+        cornerDiagnosisHistory.length >
+          100
+      ) {
+        cornerDiagnosisHistory.splice(
+          0,
+          cornerDiagnosisHistory.length -
+            100
+        );
+      }
+    }
+  }
+
   if (state.source === "lmu" && sessionTerminal) {
     state.sessionActive = false;
     if (manuallyStoppedSessionKey) manualStopSawTerminal = true;
@@ -361,6 +420,8 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
       scheduler.clear();
 
       releasePedalGraphSession();
+      cornerDiagnosisAuthority.reset();
+      cornerDiagnosisSessionKey = "";
 
       await recorder.finish();
 
@@ -493,10 +554,12 @@ return {
   port: address.port,
   ingestTelemetry: acceptTelemetry,
   telemetryMetrics: () => telemetryPipeline.snapshot(),
+  cornerDiagnoses: () => [...cornerDiagnosisHistory],
   disconnectTelemetry: disconnectTelemetrySession,
   close: async () => {
     clearInterval(simulatorTimer);
     clearInterval(voicePrewarmTimer);
+    await telemetryPipeline.idle();
     await recorder.finish();
     await localAi.dispose();
     for (const socket of wss.clients) socket.close();

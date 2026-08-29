@@ -6,14 +6,56 @@ import { trackModel } from "./track-intelligence.js";
 export class TrackModelStore {
   constructor(private readonly directory: string) {}
   async initialize(): Promise<void> { await mkdir(this.directory, { recursive: true }); }
-  async resolve(session: RecordedSession): Promise<TrackModel | null> {
-    const curated = trackModel(session.summary.track);
+
+  async matching(track: string): Promise<TrackModel | null> {
+    const curated = trackModel(track);
     if (curated) return curated;
+
+    const file =
+      path.join(
+        this.directory,
+        `${slug(track)}.json`
+      );
+
+    try {
+      return JSON.parse(
+        await readFile(file, "utf8")
+      ) as TrackModel;
+    }
+    catch {
+      return null;
+    }
+  }
+
+  async resolve(session: RecordedSession): Promise<TrackModel | null> {
+    const matched =
+      await this.matching(
+        session.summary.track
+      );
+
+    if (matched) return matched;
+
     await this.initialize();
-    const file = path.join(this.directory, `${slug(session.summary.track)}.json`);
-    try { return JSON.parse(await readFile(file, "utf8")) as TrackModel; } catch {}
-    const learned = discoverTrackModel(session);
-    if (learned) await writeFile(file, JSON.stringify(learned), "utf8");
+
+    const file =
+      path.join(
+        this.directory,
+        `${slug(session.summary.track)}.json`
+      );
+
+    const learned =
+      discoverTrackModel(
+        session
+      );
+
+    if (learned) {
+      await writeFile(
+        file,
+        JSON.stringify(learned),
+        "utf8"
+      );
+    }
+
     return learned;
   }
 }
