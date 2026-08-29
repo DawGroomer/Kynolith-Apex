@@ -36,6 +36,8 @@ test(
       new Promise<void>(resolve => {
         releaseRecorder = resolve;
       });
+    let closePromise:
+      Promise<void> | undefined;
 
     try {
       dataDir =
@@ -92,9 +94,15 @@ test(
         await recorderStartedPromise;
 
         let closeSettled = false;
-        const closePromise = running.close().then(() => {
-          closeSettled = true;
-        });
+        closePromise = running.close();
+        void closePromise.then(
+          () => {
+            closeSettled = true;
+          },
+          () => {
+            closeSettled = true;
+          }
+        );
 
         await new Promise(
           resolve => setTimeout(resolve, 50)
@@ -111,7 +119,10 @@ test(
       }
       finally {
         releaseRecorder?.();
-        await running.close().catch(() => {});
+        if (!closePromise) {
+          closePromise = running.close();
+        }
+        await closePromise.catch(() => {});
       }
     }
     finally {

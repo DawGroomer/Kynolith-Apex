@@ -248,6 +248,35 @@ export class CornerDiagnosisAuthority {
       const previous =
         this.previousFrame;
 
+      const entryZeroLapTransition =
+        corner.entry ===
+          0 &&
+        previous !== null &&
+        previous.track ===
+          frame.track &&
+        previous.vehicle ===
+          frame.vehicle &&
+        previous.session ===
+          frame.session &&
+        frame.lap ===
+          previous.lap + 1 &&
+        frame.lapDistance <
+          previous.lapDistance &&
+        frame.lapDistance <=
+          corner.apex;
+
+      if (entryZeroLapTransition) {
+        this.active.set(
+          corner.id,
+          {
+            corner,
+            frames: [frame]
+          }
+        );
+
+        continue;
+      }
+
       if (
         !previous ||
         !sameEvidenceOwner(

@@ -1186,3 +1186,125 @@ test(
     );
   }
 );
+
+
+test(
+  "entry-zero corner opens only at an observed lap transition",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    authority.configure({
+      model: {
+        ...model,
+        corners: [
+          {
+            id: "entry-zero-t1",
+            name: "Entry Zero Turn 1",
+            entry: 0,
+            apex: 0.50,
+            exit: 0.90
+          }
+        ]
+      },
+      reference: null
+    });
+
+    const completed: unknown[] = [];
+
+    for (
+      const item of [
+        frame(0.99, 13_000, { lap: 2 }),
+        frame(0.01, 14_000, { lap: 3 }),
+        frame(0.10, 14_100, { lap: 3 }),
+        frame(0.50, 14_200, { lap: 3 }),
+        frame(0.80, 14_300, { lap: 3 }),
+        frame(0.90, 14_400, { lap: 3 }),
+        frame(0.91, 14_500, { lap: 3 })
+      ]
+    ) {
+      completed.push(
+        ...authority.ingest(item)
+      );
+    }
+
+    assert.equal(
+      completed.length,
+      1
+    );
+
+    const result =
+      completed[0] as {
+        lap: number;
+        completedAt: number;
+      };
+
+    assert.equal(
+      result.lap,
+      3
+    );
+
+    assert.equal(
+      result.completedAt,
+      14_500
+    );
+  }
+);
+
+
+test(
+  "entry-zero corner does not open from first mid-corner observation",
+  async () => {
+    const {
+      CornerDiagnosisAuthority
+    } = await import(
+      "./corner-diagnosis-authority.js"
+    );
+
+    const authority =
+      new CornerDiagnosisAuthority();
+
+    authority.configure({
+      model: {
+        ...model,
+        corners: [
+          {
+            id: "entry-zero-guard-t1",
+            name: "Entry Zero Guard Turn 1",
+            entry: 0,
+            apex: 0.50,
+            exit: 0.90
+          }
+        ]
+      },
+      reference: null
+    });
+
+    const completed: unknown[] = [];
+
+    for (
+      const item of [
+        frame(0.10, 15_000),
+        frame(0.50, 15_100),
+        frame(0.80, 15_200),
+        frame(0.90, 15_300),
+        frame(0.91, 15_400)
+      ]
+    ) {
+      completed.push(
+        ...authority.ingest(item)
+      );
+    }
+
+    assert.deepEqual(
+      completed,
+      []
+    );
+  }
+);
