@@ -14,20 +14,20 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
 Push-Location $projectRoot
 try {
-  & pnpm exec electron-builder --win portable "--config.directories.output=$packageRoot"
+  & pnpm exec electron-builder --win nsis "--config.directories.output=$packageRoot"
   if ($LASTEXITCODE -ne 0) {
     throw "electron-builder failed with exit code $LASTEXITCODE"
   }
 
-  $artifacts = @(Get-ChildItem -LiteralPath $packageRoot -Filter "Kynolith-Apex-LMU-Coach-*-portable.exe" -File)
+  $artifacts = @(Get-ChildItem -LiteralPath $packageRoot -Filter "Kynolith-Apex-LMU-Coach-*-setup.exe" -File)
   if ($artifacts.Count -ne 1) {
-    throw "Expected one portable Apex executable, found $($artifacts.Count) in $packageRoot"
+    throw "Expected one NSIS setup artifact, found $($artifacts.Count) in $packageRoot"
   }
 
   New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
   $destination = Join-Path $releaseRoot $artifacts[0].Name
   Copy-Item -LiteralPath $artifacts[0].FullName -Destination $destination -Force
-  Write-Host "Portable build copied to $destination"
+  Write-Host "Setup build copied to $destination"
 }
 finally {
   Pop-Location

@@ -22,6 +22,13 @@ async function readPackage(): Promise<JsonObject> {
   ) as JsonObject;
 }
 
+async function readPackagingWrapper(): Promise<string> {
+  return readFile(
+    path.resolve("scripts", "package-windows.ps1"),
+    "utf8"
+  );
+}
+
 function buildConfig(packageJson: JsonObject): JsonObject {
   assert.ok(
     isObject(packageJson.build),
@@ -196,6 +203,70 @@ test(
     assert.ok(
       (Array.isArray(build.files) ? build.files : []).includes("config/**/*"),
       "bundled model manifest must be included through config/**/*"
+    );
+  }
+);
+
+test(
+  "Windows packaging wrapper selects the canonical NSIS setup artifact",
+  async () => {
+    const script = await readPackagingWrapper();
+
+    assert.match(
+      script,
+      /Kynolith-Apex-LMU-Coach-\*-setup\.exe/,
+      "wrapper must select the canonical setup artifact"
+    );
+    assert.doesNotMatch(
+      script,
+      /--win\s+portable/,
+      "wrapper must not request a portable target"
+    );
+    assert.doesNotMatch(
+      script,
+      /-portable\.exe/,
+      "wrapper must not require a portable artifact"
+    );
+  }
+);
+
+test(
+  "Windows packaging wrapper rejects zero or multiple setup artifacts",
+  async () => {
+    const script = await readPackagingWrapper();
+
+    assert.match(
+      script,
+      /\$artifacts\.Count\s+-ne\s+1/,
+      "wrapper must require exactly one setup artifact"
+    );
+    assert.match(
+      script,
+      /Expected one NSIS setup artifact/,
+      "wrapper must identify zero or multiple setup artifacts deterministically"
+    );
+  }
+);
+
+test(
+  "Windows packaging wrapper copies the canonical setup artifact to release",
+  async () => {
+    const script = await readPackagingWrapper();
+
+    assert.match(
+      script,
+      /\$destination\s*=\s*Join-Path\s+\$releaseRoot\s+\$artifacts\[0\]\.Name/,
+      "wrapper must retain the exact setup artifact name"
+    );
+    assert.match(
+      script,
+      /Copy-Item\s+-LiteralPath\s+\$artifacts\[0\]\.FullName\s+-Destination\s+\$destination\s+-Force/,
+      "wrapper must copy the selected setup artifact to release"
+    );
+    assert.match(
+      script,
+      /Setup build copied to \$destination/,
+      "wrapper must report the canonical setup artifact"
     );
   }
 );
