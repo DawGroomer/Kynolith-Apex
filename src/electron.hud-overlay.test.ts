@@ -40,3 +40,22 @@ test("Electron HUD is a native transparent click-through overlay", async () => {
   assert.match(hudCss, /background:\s*transparent\s*!important/);
   assert.match(hudCss, /position:\s*fixed/);
 });
+
+test("locked HUD keeps close controls interactive without disabling click-through", async () => {
+  const [main, preload, app, hudCss] = await Promise.all([
+    readFile(path.join(repositoryRoot, "electron/main.cjs"), "utf8"),
+    readFile(path.join(repositoryRoot, "electron/preload.cjs"), "utf8"),
+    readFile(path.join(repositoryRoot, "public/app.js"), "utf8"),
+    readFile(path.join(repositoryRoot, "public/hud.css"), "utf8"),
+  ]);
+
+  assert.match(main, /apex:set-hud-controls-interactive/);
+  assert.match(preload, /setHudControlsInteractive/);
+  assert.match(app, /elementFromPoint/);
+  assert.match(app, /hud-actions, \.hud-close/);
+  assert.doesNotMatch(
+    app,
+    /module\.querySelector\("\[data-hud-close\]"\)\?\.addEventListener\("click",event=>\{\s*if\(hudLocked\)return;/
+  );
+  assert.match(hudCss, /hud-locked \.hud-close[\s\S]*pointer-events:\s*auto/);
+});

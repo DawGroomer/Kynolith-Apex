@@ -404,10 +404,14 @@ body.hud-mode.hud-locked .hud-resize-handle {
   pointer-events: none;
 }
 
-body.hud-mode.hud-locked .hud-close,
 body.hud-mode.hud-locked .hud-restore {
   opacity: .22;
   pointer-events: none;
+}
+
+body.hud-mode.hud-locked .hud-close {
+  opacity: .72;
+  pointer-events: auto;
 }
 
 @media (max-width: 1100px) {

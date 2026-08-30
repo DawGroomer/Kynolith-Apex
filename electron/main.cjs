@@ -222,9 +222,19 @@ function setHudLocked(locked) {
   }
 }
 
+function setHudControlsInteractive(interactive) {
+  if (!hudLocked || !hudWindow || hudWindow.isDestroyed()) return;
+
+  hudWindow.setIgnoreMouseEvents(!interactive, { forward: true });
+}
+
 ipcMain.handle("apex:open-hud", () => showHudWindow());
 ipcMain.handle("apex:close-hud", () => closeHudWindow());
 ipcMain.handle("apex:set-hud-locked", (_event, locked) => setHudLocked(locked));
+ipcMain.handle(
+  "apex:set-hud-controls-interactive",
+  (_event, interactive) => setHudControlsInteractive(Boolean(interactive))
+);
 
 async function createWindow() {
   process.env.KYNOLITH_DESKTOP = "1";

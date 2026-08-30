@@ -111,7 +111,6 @@ function bindHudLayoutEditing(){
       window.addEventListener("pointerup",finish,{once:true});
     });
     module.querySelector("[data-hud-close]")?.addEventListener("click",event=>{
-      if(hudLocked)return;
       event.stopPropagation();
       hudLayout[key]={...hudLayout[key],visible:false};
       applyHudLayout();
@@ -282,7 +281,18 @@ hudLock?.addEventListener("click",()=>{
   hudLocked=!hudLocked;
   hudLock.textContent=hudLocked?"LOCKED // RACE":"UNLOCKED // EDIT";
   document.body.classList.toggle("hud-locked",hudLocked);
+  if(!hudLocked) void desktopBridge?.setHudControlsInteractive?.(false);
   void desktopBridge?.setHudLocked?.(hudLocked);
+});
+
+let hudControlsInteractive=false;
+window.addEventListener("mousemove",event=>{
+  if(!hudLocked)return;
+  const target=document.elementFromPoint(event.clientX,event.clientY);
+  const interactive=Boolean(target?.closest(".hud-actions, .hud-close"));
+  if(interactive===hudControlsInteractive)return;
+  hudControlsInteractive=interactive;
+  void desktopBridge?.setHudControlsInteractive?.(interactive);
 });
 
 if(dedicatedHud)applyPresentationMode();
