@@ -163,9 +163,9 @@ export class CoachingEngine {
         ? (frame.brake > .18 ? ["coach-brake", "Smooth off the brake. Look through the exit."] : Math.abs(frame.steering) > .3 ? ["coach-steering", "Eyes through the corner. One smooth steering input."] : ["coach-marker", "Use the same marker. Smooth on, smooth off."])
         : this.curriculumLevel === 1
           ? (frame.brake > .18 ? ["coach-brake-loaded", "Release the brake progressively and keep the front loaded."] : Math.abs(frame.steering) > .3 ? ["coach-balance", "Balance steering against throttle. Unwind before adding power."] : ["coach-min-speed", "Protect minimum speed with one clean release."])
-          : frame.brake > .18 ? ["coach-reference-brake", "Match the reference release and protect apex speed."]
-            : Math.abs(frame.steering) > .3 ? ["coach-reference-arc", "Hold the reference arc. Minimize scrub."]
-            : frame.throttle > .75 ? ["coach-reference-exit", "Good. Compare that exit against the reference."]
+          : frame.brake > .18 ? ["coach-reference-brake", "Release the brake smoothly and protect apex speed."]
+            : Math.abs(frame.steering) > .3 ? ["coach-reference-arc", "Hold a clean arc. Minimize scrub."]
+            : frame.throttle > .75 ? ["coach-reference-exit", "Good. Keep the exit clean and progressive."]
             : ["coach-session-target", "Stay on the session target. Change one reference at a time."];
       this.emit(cues, frame, guidanceKey, 18_000, "technique", "lap", guidance);
       this.lastGuidanceAt = frame.timestamp;
