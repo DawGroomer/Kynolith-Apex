@@ -52,6 +52,7 @@
     "directories": {
       "output": "release"
     },
+    "icon": "public/assets/ApexLogo.ico",
     "files": [
       "dist/**/*",
       "public/**/*",

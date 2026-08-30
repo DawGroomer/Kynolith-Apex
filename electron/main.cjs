@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, session, shell } = require("electron");
+const { app, BrowserWindow, dialog, nativeImage, session, shell } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { spawn } = require("node:child_process");
@@ -78,7 +78,10 @@ function scheduleUpdateChecks(server) {
 }
 async function createWindow() {
   process.env.KYNOLITH_DESKTOP = "1";
+  app.setAppUserModelId("com.kynolith.apex.lmucoach");
   const appRoot = app.getAppPath();
+  const appIconPath = path.join(appRoot, "public", "assets", "ApexLogo.ico");
+  const appIcon = nativeImage.createFromPath(appIconPath);
   const serverModuleUrl = pathToFileURL(path.join(appRoot, "dist", "server.js")).href;
   const { startCoachServer } = await import(serverModuleUrl);
   const userData = app.getPath("userData");
@@ -102,7 +105,8 @@ async function createWindow() {
     height: 900,
     minWidth: 980,
     minHeight: 680,
-    backgroundColor: "#060a0c",
+    backgroundColor: "#060605",
+    icon: appIconPath,
     autoHideMenuBar: true,
     title: "Kynolith Apex // LMU Coach",
     webPreferences: {
@@ -111,6 +115,15 @@ async function createWindow() {
       sandbox: true
     }
   });
+  if (!appIcon.isEmpty()) {
+    win.setIcon(appIcon);
+    if (process.platform === "win32") {
+      win.setAppDetails({
+        appId: "com.kynolith.apex.lmucoach",
+        appIconPath
+      });
+    }
+  }
   await win.loadURL(`http://127.0.0.1:${coachServer.port}`);
   scheduleUpdateChecks(coachServer);
 }
