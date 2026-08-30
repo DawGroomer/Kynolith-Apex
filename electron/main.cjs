@@ -252,7 +252,15 @@ async function createWindow() {
     dataDir: userData,
     bundledModelsDir: app.isPackaged
       ? path.join(process.resourcesPath, "models")
-      : path.join(appRoot, "offline-models")
+      : path.join(appRoot, "offline-models"),
+    ...(app.isPackaged
+      ? { allowModelDownloads: false }
+      : { allowModelDownloads: true }),
+    bundledModelsManifest: path.join(
+      appRoot,
+      "config",
+      "bundled-model-manifest.json"
+    )
   });
   startTelemetryBridge(coachServer);
 

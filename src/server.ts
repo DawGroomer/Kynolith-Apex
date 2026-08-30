@@ -32,6 +32,7 @@ export interface CoachServerOptions {
   publicDir?: string;
   dataDir?: string;
   bundledModelsDir?: string;
+  bundledModelsManifest?: string;
   allowModelDownloads?: boolean;
   prewarmVoices?: boolean;
 }
@@ -65,10 +66,18 @@ await calibration.initialize();
 scheduler.setMinimumSpacing(spacingFor(settings.get().speechFrequency));
 scheduler.setTechniquePolicy(settings.get().speechFrequency);
 engine.setInstructionMode(settings.get().speechFrequency);
+const bundledModelsManifest = options.bundledModelsManifest ??
+  (options.bundledModelsDir
+    ? path.resolve("config", "bundled-model-manifest.json")
+    : undefined);
 const localAi = new LocalAi(path.join(dataDir, "models"), {
   ...(options.bundledModelsDir ? { bundledModelsDirectory: options.bundledModelsDir } : {}),
+  ...(bundledModelsManifest ? { bundledModelsManifest } : {}),
   ...(options.allowModelDownloads === undefined ? {} : { allowModelDownloads: options.allowModelDownloads })
 });
+if (options.bundledModelsDir && options.allowModelDownloads === false) {
+  await localAi.validateBundledBundle();
+}
 let welcomedSessionKey = "";
 let terminalSession = false;
 let terminalCandidateSince = 0;

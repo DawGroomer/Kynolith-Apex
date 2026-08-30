@@ -57,6 +57,7 @@
       "dist/**/*",
       "public/**/*",
       "electron/**/*",
+      "config/**/*",
       "package.json",
       "THIRD_PARTY_NOTICES.md"
     ],

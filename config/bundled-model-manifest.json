@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "files": {
+    "onnx-community/whisper-tiny.en/config.json": "251ea843b5901a99efa58c0b99b8052c6019aa3e7d2baf46693a1128ff606233",
+    "onnx-community/whisper-tiny.en/onnx/encoder_model_quantized.onnx": "e93ec822f16a8fd264e7de972ad17d615ea7334b75a52d54c50c2e18dd503a25",
+    "onnx-community/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx": "c0592d0749413c960569e1c7fb806b060d5d18f3ebad4a95cbf9a77dc6e9be52",
+    "onnx-community/Qwen3-0.6B-ONNX/config.json": "8a04114ba59cc42b47d804d35d1d5c61d746ae4634f41f796768c6e302d39b9e",
+    "onnx-community/Qwen3-0.6B-ONNX/onnx/model_q4.onnx": "d43d836fc5e240df9013733ccd214972c5d21bd9ec47e574e4f1e359cf90aed0",
+    "onnx-community/Kokoro-82M-v1.0-ONNX/config.json": "df34b4f930b23447cd4dc410fabfb42eb3f24e803e6c3f97d618fb359380a36f",
+    "onnx-community/Kokoro-82M-v1.0-ONNX/onnx/model_quantized.onnx": "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478",
+    "onnx-community/Kokoro-82M-v1.0-ONNX/voices/af_heart.bin": "d583ccff3cdca2f7fae535cb998ac07e9fcb90f09737b9a41fa2734ec44a8f0b"
+  }
+}
