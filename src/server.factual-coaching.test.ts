@@ -190,6 +190,17 @@ test(
         "utf8"
       );
 
+      await writeFile(
+        path.join(
+          dataDir,
+          "settings.json"
+        ),
+        JSON.stringify({
+          speechFrequency: "active"
+        }),
+        "utf8"
+      );
+
       const {
         startCoachServer
       } = await import(
@@ -223,7 +234,11 @@ test(
         lap: 2,
         lapDistance,
         brake:
-          lapDistance <= 0.14
+          lapDistance === 0.16
+            ? 0
+            : lapDistance >= 0.21
+              ? 0
+              : lapDistance <= 0.14
             ? 0.8
             : 0.2,
         throttle:
@@ -248,9 +263,9 @@ test(
         [0.12, 10_200],
         [0.14, 10_300],
         [0.16, 10_400],
-        [0.18, 10_500],
-        [0.20, 10_600],
-        [0.21, 10_700]
+        [0.18, 30_500],
+        [0.20, 30_600],
+        [0.21, 30_700]
       ] as const;
 
       for (
@@ -286,7 +301,7 @@ test(
       }
 
       const flushTimestamp =
-        10_800;
+        30_800;
       const flushProcessed =
         waitForFrame(
           socket,
@@ -316,6 +331,48 @@ test(
         liveCues.push(
           flushPayload.cue
         );
+      }
+
+      const legacyCornerTail = [
+        51_000,
+        51_100,
+        51_200,
+        51_300
+      ] as const;
+
+      for (
+        const timestamp
+        of legacyCornerTail
+      ) {
+        const processed =
+          waitForFrame(
+            socket,
+            timestamp
+          );
+
+        assert.equal(
+          running.ingestTelemetry(
+            {
+              ...frame(
+                0.21,
+                timestamp
+              ),
+              lateralG: 0
+            }
+          ),
+          true
+        );
+
+        const payload =
+          await processed;
+
+        if (
+          payload.cue
+        ) {
+          liveCues.push(
+            payload.cue
+          );
+        }
       }
 
       const history =
@@ -396,6 +453,20 @@ test(
           cue => claimMessages.has(cue.message)
         ),
         "A C5D factual claim did not reach the /live coaching cue output"
+      );
+
+      const legacyPedalCornerCues =
+        liveCues.filter(
+          cue =>
+            /^(corner-review|corner-clean|coast|throttle-stab|clean-exit|steering-spike)-/.test(
+              cue.id
+            )
+        );
+
+      assert.deepEqual(
+        legacyPedalCornerCues,
+        [],
+        "Legacy raw pedal/corner coaching duplicated the C5D factual cue"
       );
     }
     finally {

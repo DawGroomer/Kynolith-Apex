@@ -1,5 +1,4 @@
 import type { CoachingCue, TelemetryFrame } from "./types.js";
-import { CornerCoach } from "./corner-coach.js";
 import { RacecraftPredictor } from "./racecraft-predictor.js";
 import { StrategyCoach } from "./strategy-coach.js";
 import { ShiftCoach } from "./shift-coach.js";
@@ -17,7 +16,6 @@ export class CoachingEngine {
   private instructionIntervalMs = 20_000;
   private instructionMode: "quiet" | "balanced" | "active" = "balanced";
   private curriculumLevel: 0 | 1 | 2 | 3 = 0;
-  private cornerCoach = new CornerCoach();
   private racecraftPredictor = new RacecraftPredictor();
   private strategyCoach = new StrategyCoach();
   private shiftCoach = new ShiftCoach();
@@ -128,28 +126,11 @@ export class CoachingEngine {
     this.lastLap = frame.lap;
     if (frame.inPits && frame.speedKph > 80) this.emit(cues, frame, "pit-speed", 4_000, "critical", "safety", "Pit lane speed. Brake now and engage the limiter.");
 
-    const prev = this.history.at(-2)?.frame;
     const wheelSlip = frame.wheelSlipRatio ?? [0, 0, 0, 0];
     const locking = frame.brake > .35 && frame.speedKph > 60 && wheelSlip.some(value => value < -.22);
     this.lockupSeen = locking ? this.lockupSeen + 1 : 0;
     if (this.lockupSeen === 3) this.emit(cues, frame, "wheel-lock", 12_000, "technique", "braking", "Wheel locking. Ease brake pressure slightly.");
     if (frame.tcActive && frame.throttle > .65 && Math.abs(frame.steering) > .2) this.emit(cues, frame, "tc-active", 15_000, "technique", "throttle", "Traction control is working. Unwind the wheel before adding more throttle.");
-    if (prev && this.instructionMode !== "active" && !frame.inPits) {
-      const steeringDelta = Math.abs(frame.steering - prev.steering);
-      if (frame.speedKph > 120 && steeringDelta > 0.22 && frame.brake < 0.1) {
-        this.emit(cues, frame, "steering-spike", 10_000, "technique", "steering", "Easy on that initial steering input. One clean turn-in will keep the platform settled.");
-      }
-      if (prev.brake > 0.45 && frame.brake < 0.08 && frame.throttle < 0.08 && frame.speedKph > 70) {
-        this.emit(cues, frame, "coast", 12_000, "technique", "braking", "You're close. Release the brake more progressively toward the apex and shorten that coast phase.");
-      }
-      if (prev.throttle < 0.2 && frame.throttle > 0.85 && Math.abs(frame.steering) > 0.42) {
-        this.emit(cues, frame, "throttle-stab", 12_000, "technique", "throttle", "Nice and patient here. Feed in the throttle as you unwind the wheel.");
-      }
-      if (Math.abs(prev.steering) > 0.35 && Math.abs(frame.steering) < 0.18 && frame.throttle > 0.65 && frame.throttle >= prev.throttle) {
-        this.emit(cues, frame, "clean-exit", 35_000, "technique", "throttle", "That's better. Good unwind, and a clean drive off the corner.");
-      }
-    }
-    cues.push(...this.cornerCoach.ingest(frame, this.instructionMode === "active"));
     cues.push(...this.shiftCoach.ingest(frame));
     if (this.curriculumLevel >= 2) cues.push(...this.racecraftPredictor.ingest(frame));
     if (this.curriculumLevel >= 3) cues.push(...this.strategyCoach.ingest(frame));
