@@ -75,8 +75,28 @@
       }
     ],
     "win": {
-      "target": "portable",
-      "artifactName": "Kynolith-Apex-LMU-Coach-${version}-portable.${ext}"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Kynolith-Apex-LMU-Coach-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": false,
+      "shortcutName": "Kynolith Apex",
+      "uninstallDisplayName": "Kynolith Apex",
+      "guid": "c3ccacb5-a800-5246-8b4b-d3e78e297f70",
+      "include": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false
     }
   }
 }
