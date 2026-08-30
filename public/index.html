@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kynolith Apex // LMU Coach</title><link rel="icon" type="image/png" href="/assets/ApexLogo.png"><link rel="apple-touch-icon" href="/assets/ApexLogo.png"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/settings.css"><link rel="stylesheet" href="/mic.css"><link rel="stylesheet" href="/profile.css"><link rel="stylesheet" href="/intelligence.css"><link rel="stylesheet" href="/academy.css"><link rel="stylesheet" href="/session-control.css"><link rel="stylesheet" href="/hud.css"></head>
-<body><main id="desktopApp"><aside class="rail" aria-label="Apex navigation"><div class="rail-brand"><img src="/assets/KynolithLogo02.png" alt="Kynolith"><span>APEX</span></div><nav class="rail-nav"><button class="nav active" data-view="live"><span class="rail-icon">▦</span><span>DASHBOARD</span></button><button class="nav" data-view="profile"><span class="rail-icon">◷</span><span>PROFILE</span></button><button class="nav" data-view="review"><span class="rail-icon">⌁</span><span>SESSIONS</span></button><button class="nav" data-view="race"><span class="rail-icon">◇</span><span>RACE ENGINEER</span></button><button class="nav" data-view="setup"><span class="rail-icon">⌬</span><span>SETUP LAB</span></button><button class="nav" data-view="settings"><span class="rail-icon">⚙</span><span>SETTINGS</span></button></nav><div class="rail-footer"><span class="connection-dot"></span><span id="railConnection">SIM</span></div></aside><div class="app-shell"><header class="topbar"><div class="brand-lockup"><p class="eyebrow">KYNOLITH DRIVER SYSTEMS</p><h1>APEX <span>// LMU COACH</span></h1></div><div class="session-bar"><div><span>SESSION</span><strong id="barSession">PRACTICE</strong></div><div><span>TRACK</span><strong id="barTrack">—</strong></div><div><span>CAR</span><strong id="barVehicle">—</strong></div><div><span>CONNECTION</span><strong id="barConnection">SIMULATOR</strong></div></div><div class="header-runtime"><span class="live-badge"><i></i> LIVE</span><button id="hudEnter" class="hud-enter secondary">HUD MODE</button><div id="status" class="status">CONNECTING</div></div></header>
+<body><main id="desktopApp"><aside class="rail" aria-label="Apex navigation"><div class="rail-brand"><img src="/assets/KynolithLogo02.png" alt="Kynolith"><span>APEX</span></div><nav class="rail-nav"><button class="nav active" data-view="live"><span class="rail-icon">▦</span><span>DASHBOARD</span></button><button class="nav" data-view="profile"><span class="rail-icon">◷</span><span>PROFILE</span></button><button class="nav" data-view="review"><span class="rail-icon">⌁</span><span>SESSIONS</span></button><button class="nav" data-view="race"><span class="rail-icon">◇</span><span>RACE ENGINEER</span></button><button class="nav" data-view="setup"><span class="rail-icon">⌬</span><span>SETUP LAB</span></button><button class="nav" data-view="settings"><span class="rail-icon">⚙</span><span>SETTINGS</span></button></nav><div class="rail-footer"><span class="connection-dot"></span><span id="railConnection">SIM</span></div></aside><div class="app-shell"><header class="topbar"><div class="brand-lockup"><p class="eyebrow">KYNOLITH DRIVER SYSTEMS</p><h1>APEX <span>// LMU COACH</span></h1></div><div class="session-bar"><div><span>SESSION</span><strong id="barSession">PRACTICE</strong></div><div><span>TRACK</span><strong id="barTrack">—</strong></div><div><span>CAR</span><strong id="barVehicle">—</strong></div><div><span>CONNECTION</span><strong id="barConnection">SIMULATOR</strong></div></div><div class="header-runtime"><span class="live-badge"><i></i> LIVE</span><button id="hudEnter" class="hud-enter secondary">HUD MODE</button><div id="status" class="status">CONNECTING</div></div></header><main id="mainWorkspace">
 
 <section id="liveView" class="view active"><section class="dashboard-grid"><article class="panel telemetry-panel"><div class="panel-heading"><div><p class="eyebrow">LIVE TELEMETRY</p><h3>Driver inputs</h3></div><span class="panel-state"><i></i> STREAMING</span></div><div class="telemetry-primary"><div class="telemetry-stat"><span>GEAR</span><strong id="gear">–</strong></div><div class="telemetry-speed"><span>SPEED</span><strong id="speed">---</strong><small>MPH</small></div><div class="telemetry-stat telemetry-rpm"><span>RPM</span><strong id="rpm">—</strong><div class="rpm-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="input-grid"><div class="input-meter throttle-meter"><div><span>THROTTLE</span><b id="throttleValue">—</b></div><div class="meter-track"><i id="throttle"></i></div></div><div class="input-meter brake-meter"><div><span>BRAKE</span><b id="brakeValue">—</b></div><div class="meter-track"><i id="brake"></i></div></div><div class="input-meter fuel-meter"><div><span>FUEL</span><b id="fuel">—</b></div><div class="meter-track"><i id="fuelMeter"></i></div></div></div><div class="telemetry-footer"><span>LAP <b id="lap">—</b></span><span>POSITION <b id="position">—</b></span><span>GAP <b id="gap">—</b></span></div><div class="telemetry-health" aria-label="Car health"><span class="health-title">CAR HEALTH <b>NOMINAL</b></span><span>HOT TIRE <b id="tire">—</b></span><span>PRESSURE <b id="pressure">—</b></span><span>SOURCE <b id="source">—</b></span></div></article><article class="panel coaching-panel"><div class="panel-heading"><div><p class="eyebrow">COACHING</p><h3>Live factual feed</h3></div><span class="panel-state"><i></i> LIVE</span></div><div class="coach-feed"><div class="coach-feed-item"><span class="coach-icon">◆</span><div><span class="feed-label">APEX // TECHNIQUE</span><h2 id="cue">Build rhythm first. Pace follows.</h2><p id="sessionControlState">Apex automatically records practice, qualifying, and race sessions.</p></div><span class="feed-age">NOW</span></div><div class="coach-feed-empty" aria-hidden="true"></div><div class="coach-feed-empty" aria-hidden="true"></div></div><div class="coach-actions"><button id="voice">HOLD TO TALK</button><button id="stopSession" class="stop-session" disabled>STOP SESSION</button></div><div class="coach-status"><span id="voiceState">Local voice ready • models run locally</span><span class="cue-age">READY FOR NEXT CALL</span></div></article><aside class="panel hud-preview-panel"><div class="panel-heading"><div><p class="eyebrow">HUD PRESETS</p><h3>Focus mode</h3></div><span class="panel-state">READY</span></div><div class="hud-preset-stack"><div class="hud-mini"><div><strong id="hudPreviewSpeed">---</strong><span>MPH</span></div><b id="hudPreviewGear">–</b><span class="hud-mini-rpm" id="hudPreviewRpm">— RPM</span><div class="hud-mini-bar"><i id="hudPreviewThrottle"></i><i id="hudPreviewBrake"></i></div><span class="hud-preset-label">1 / PERFORMANCE <b>LIVE</b></span></div><div class="hud-mini hud-mini-muted"><div><strong>---</strong><span>MPH</span></div><b>–</b><span class="hud-mini-rpm">PRESET PREVIEW</span><span class="hud-preset-label">2 / MINIMAL <b>READY</b></span></div><div class="hud-mini hud-mini-muted"><div><strong>---</strong><span>MPH</span></div><b>–</b><span class="hud-mini-rpm">PRESET PREVIEW</span><span class="hud-preset-label">3 / TRACK FOCUS <b>READY</b></span></div><div class="hud-mini hud-mini-muted"><div><strong>---</strong><span>MPH</span></div><b>–</b><span class="hud-mini-rpm">PRESET PREVIEW</span><span class="hud-preset-label">4 / COACHING FOCUS <b>READY</b></span></div></div><button id="hudEnterPanel" class="secondary full-width">OPEN LIVE HUD</button></aside></section><section class="dashboard-secondary-grid"><article class="panel inactive-panel"><div class="panel-heading"><div><p class="eyebrow">TRACK MAP</p><h3>Live position map</h3></div><span class="panel-state">SESSION REVIEW</span></div><div class="inactive-state"><span class="inactive-icon">⌁</span><strong>Track map available after a recorded lap</strong><p>Live telemetry is connected. Apex will render the verified circuit trace in Session Review when enough positional evidence is available.</p></div></article><article class="panel inactive-panel"><div class="panel-heading"><div><p class="eyebrow">LAP TRACE COMPARISON</p><h3>Current versus best</h3></div><span class="panel-state">AWAITING DATA</span></div><div class="inactive-state"><span class="inactive-icon">∿</span><strong>No trusted comparison lap yet</strong><p>Comparison stays inactive until Apex has a complete, trusted lap and a reference it can prove.</p></div></article><article class="panel voice-panel"><div class="panel-heading"><div><p class="eyebrow">VOICE ASSISTANT</p><h3>Always on your side</h3></div><span class="panel-state"><i></i> LOCAL</span></div><div class="voice-orb"><span>◉</span></div><p class="voice-listening">Voice controls ready</p><button class="secondary full-width" onclick="document.getElementById('voice').focus()">HOLD TO TALK</button></article></section><article class="panel summary-panel"><div class="panel-heading"><div><p class="eyebrow">SESSION SUMMARY</p><h3>Current run at a glance</h3></div><span class="panel-state" id="summarySource">SIMULATOR</span></div><div class="summary-metrics"><div><span>BEST LAP</span><strong id="bestLap">—</strong><small>verified session time</small></div><div><span>LAST LAP</span><strong id="lastLap">—</strong><small>most recent complete lap</small></div><div><span>CONSISTENCY</span><strong id="consistencyLive">—</strong><small>variance versus best</small></div><div><span>SESSION</span><strong id="summarySession">PRACTICE</strong><small>live telemetry mode</small></div></div></article><div class="live-footer"><span><i></i> DATA SOURCE <b id="footerSource">SIMULATOR</b></span><span>LOCAL PIPELINE <b>ACTIVE</b></span><span>VOICE <b id="footerVoice">READY</b></span></div></section>
 
@@ -26,7 +26,7 @@
 <div class="settings-actions"><span id="settingsState">Settings load automatically.</span><button id="saveSettings">SAVE SETTINGS</button></div></section>
 <section id="setupView" class="view"><div class="review-head"><div><p class="eyebrow">EVIDENCE-GATED ENGINEERING</p><h2>Change one variable. Prove the result.</h2></div><select id="setupSessionPicker"><option>No recorded sessions</option></select></div><section id="setupEmpty" class="empty">Complete at least two consistent valid laps to unlock setup diagnosis.</section><section id="setupContent" hidden><div class="setup-readiness"><article><p class="eyebrow">SETUP READINESS</p><strong id="setupReadiness" class="metric">—</strong><h3 id="setupStatus">—</h3></article><article><p class="eyebrow">EVIDENCE BLOCKERS</p><div id="setupBlockers" class="evidence-list"></div></article></div><div id="setupDiagnosisList" class="diagnosis-list"></div></section></section>
 <section id="raceView" class="view"><div class="review-head"><div><p class="eyebrow">STINT &amp; STRATEGY INTELLIGENCE</p><h2>Turn representative laps into a race plan.</h2></div><select id="raceSessionPicker"><option>No recorded sessions</option></select></div><section id="raceEmpty" class="empty">Complete two representative laps to establish strategy trends.</section><section id="raceContent" hidden><div class="strategy-grid"><article><p class="eyebrow">STRATEGY STATUS</p><strong id="strategyStatus" class="metric">—</strong><p id="strategyRecommendation"></p></article><article><p class="eyebrow">FUEL / LAP</p><strong id="strategyFuel" class="metric">—</strong></article><article><p class="eyebrow">LAPS REMAINING</p><strong id="strategyRange" class="metric">—</strong></article><article><p class="eyebrow">TIRE WEAR / LAP</p><strong id="strategyWear" class="metric">—</strong></article><article><p class="eyebrow">PACE TREND</p><strong id="strategyPace" class="metric">—</strong></article><article><p class="eyebrow">PROJECTED TIRE STINT</p><strong id="strategyStint" class="metric">—</strong></article><article><p class="eyebrow">VIRTUAL ENERGY / LAP</p><strong id="strategyEnergy" class="metric">—</strong></article><article><p class="eyebrow">ENERGY LAPS REMAINING</p><strong id="strategyEnergyRange" class="metric">—</strong></article></div><article><p class="eyebrow">TRACK MODEL</p><h3 id="learnedTrackStatus">—</h3><div id="learnedCorners" class="corner-chip-list"></div></article></section></section>
-</main>
+</main></div></main>
 
 <section id="hudView" class="hud-shell" hidden aria-label="Apex in-game HUD">
   <header class="hud-topbar">
@@ -38,105 +38,86 @@
       <span id="hudConnection">WAITING FOR LMU</span>
       </div>
     </div>
-    <button id="hudExit" class="hud-exit">FULL APEX</button>
+    <div class="hud-actions"><button id="hudLock" class="hud-lock" type="button">UNLOCKED // EDIT</button><button id="hudRestore" class="hud-restore" type="button">RESTORE WIDGETS</button><button id="hudExit" class="hud-exit">FULL APEX</button></div>
   </header>
 
   <section id="hudGrid" class="hud-grid">
+    <section class="hud-left-rail" aria-label="Live telemetry and track map">
+      <section class="hud-cluster hud-telemetry-cluster" data-hud-module="telemetry">
+        <div class="hud-cluster-heading" data-hud-drag-handle><span>LIVE TELEMETRY</span><i id="hudTelemetryState">SIMULATOR</i><button class="hud-close" data-hud-close type="button" aria-label="Hide live telemetry">×</button><button class="hud-resize-handle" type="button" aria-label="Scale live telemetry">↘</button></div>
+        <div class="hud-primary-row">
+          <article class="hud-card hud-primary hud-speed" data-hud-field="speed">
+            <span>SPEED</span>
+            <strong id="hudSpeed">---</strong>
+            <small>MPH</small>
+          </article>
+          <article class="hud-card hud-primary hud-gear" data-hud-field="gear">
+            <span>GEAR</span>
+            <strong id="hudGear">–</strong>
+          </article>
+          <article class="hud-card hud-rpm" data-hud-field="rpm">
+            <span>RPM</span>
+            <strong id="hudRpm">—</strong>
+          </article>
+        </div>
+        <div class="hud-pedal-stack">
+          <article class="hud-card hud-input" data-hud-field="throttle">
+            <div class="hud-input-head">
+              <span>THROTTLE</span>
+              <strong id="hudThrottleValue" class="hud-input-value">0%</strong>
+            </div>
+            <canvas id="hudThrottleGraph" class="hud-pedal-canvas" width="480" height="128" aria-label="Live throttle input graph"></canvas>
+          </article>
+          <article class="hud-card hud-input" data-hud-field="brake">
+            <div class="hud-input-head">
+              <span>BRAKE</span>
+              <strong id="hudBrakeValue" class="hud-input-value">0%</strong>
+            </div>
+            <canvas id="hudBrakeGraph" class="hud-pedal-canvas" width="480" height="128" aria-label="Live brake input graph"></canvas>
+          </article>
+          <article class="hud-card hud-fuel" data-hud-field="fuel">
+            <span>FUEL</span>
+            <strong id="hudFuel">—</strong>
+            <div class="hud-fuel-line"><i id="hudFuelMeter"></i></div>
+          </article>
+        </div>
+        <div class="hud-telemetry-meta">
+          <span data-hud-field="session"><b>SESSION</b><strong id="hudSession">—</strong></span>
+          <span data-hud-field="lap"><b>LAP</b><strong id="hudLap">—</strong></span>
+          <span data-hud-field="position"><b>POS</b><strong id="hudPosition">—</strong></span>
+          <span data-hud-field="gap"><b>GAP</b><strong id="hudGap">—</strong></span>
+          <span data-hud-field="tire"><b>TIRE</b><strong id="hudTire">—</strong></span>
+          <span data-hud-field="pressure"><b>PRESS</b><strong id="hudPressure">—</strong></span>
+          <span data-hud-field="source"><b>SOURCE</b><strong id="hudSource">—</strong></span>
+        </div>
+      </section>
+      <article class="hud-card hud-inactive hud-track-map" data-hud-module="track-map">
+        <div class="hud-module-heading" data-hud-drag-handle><span>TRACK MAP</span><i>INACTIVE</i><button class="hud-close" data-hud-close type="button" aria-label="Hide track map">×</button><button class="hud-resize-handle" type="button" aria-label="Scale track map">↘</button></div>
+        <div class="hud-map-grid"><span></span><span></span><span></span><span></span></div>
+        <p>Awaiting recorded lap</p>
+      </article>
+    </section>
 
-    <article class="hud-card hud-primary" data-hud-field="speed">
-      <span>SPEED</span>
-      <strong id="hudSpeed">---</strong>
-      <small>MPH</small>
-    </article>
+    <section class="hud-center-stage" aria-label="Open driving view">
+      <article class="hud-card hud-inactive hud-lap-trace" data-hud-module="lap-trace">
+        <div class="hud-module-heading" data-hud-drag-handle><span>LAP TRACE COMPARISON</span><i>INACTIVE</i><button class="hud-close" data-hud-close type="button" aria-label="Hide lap trace">×</button><button class="hud-resize-handle" type="button" aria-label="Scale lap trace">↘</button></div>
+        <div class="hud-trace-grid"><span></span><span></span><span></span><span></span></div>
+        <p>Awaiting trusted comparison lap</p>
+      </article>
+    </section>
 
-    <article class="hud-card hud-primary" data-hud-field="gear">
-      <span>GEAR</span>
-      <strong id="hudGear">–</strong>
-    </article>
-
-    <article class="hud-card hud-input" data-hud-field="throttle">
-      <div class="hud-input-head">
-        <span>THROTTLE</span>
-        <strong id="hudThrottleValue" class="hud-input-value">0%</strong>
-      </div>
-      <canvas
-        id="hudThrottleGraph"
-        class="hud-pedal-canvas"
-        width="480"
-        height="128"
-        aria-label="Live throttle input graph"
-      ></canvas>
-    </article>
-
-    <article class="hud-card hud-input" data-hud-field="brake">
-      <div class="hud-input-head">
-        <span>BRAKE</span>
-        <strong id="hudBrakeValue" class="hud-input-value">0%</strong>
-      </div>
-      <canvas
-        id="hudBrakeGraph"
-        class="hud-pedal-canvas"
-        width="480"
-        height="128"
-        aria-label="Live brake input graph"
-      ></canvas>
-    </article>
-
-    <article class="hud-card hud-cue" data-hud-field="cue">
-      <span>APEX COACH</span>
-      <strong id="hudCue">Build rhythm first. Pace follows.</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="voiceStatus">
-      <span>VOICE</span>
-      <strong id="hudVoiceStatus">LOCAL READY</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="session">
-      <span>SESSION</span>
-      <strong id="hudSession">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="lap">
-      <span>LAP</span>
-      <strong id="hudLap">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="position">
-      <span>POSITION</span>
-      <strong id="hudPosition">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="gap">
-      <span>GAP AHEAD</span>
-      <strong id="hudGap">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="fuel">
-      <span>FUEL</span>
-      <strong id="hudFuel">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="tire">
-      <span>HOT TIRE</span>
-      <strong id="hudTire">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="pressure">
-      <span>PRESSURE</span>
-      <strong id="hudPressure">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="rpm">
-      <span>RPM</span>
-      <strong id="hudRpm">—</strong>
-    </article>
-
-    <article class="hud-card" data-hud-field="source">
-      <span>SOURCE</span>
-      <strong id="hudSource">—</strong>
-    </article>
-
+    <section class="hud-right-rail" aria-label="Coaching and voice">
+      <article class="hud-card hud-cue" data-hud-field="cue" data-hud-module="coaching">
+        <div class="hud-module-heading" data-hud-drag-handle><span>COACHING</span><i>LIVE</i><button class="hud-close" data-hud-close type="button" aria-label="Hide coaching feed">×</button><button class="hud-resize-handle" type="button" aria-label="Scale coaching feed">↘</button></div>
+        <strong id="hudCue">Build rhythm first. Pace follows.</strong>
+      </article>
+      <article class="hud-card hud-voice" data-hud-field="voiceStatus" data-hud-module="voice">
+        <div class="hud-module-heading" data-hud-drag-handle><span>VOICE ASSISTANT</span><i>LOCAL</i><button class="hud-close" data-hud-close type="button" aria-label="Hide voice assistant">×</button><button class="hud-resize-handle" type="button" aria-label="Scale voice assistant">↘</button></div>
+        <div class="hud-microphone"><span>●</span></div>
+        <strong id="hudVoiceStatus">LOCAL READY</strong>
+        <p>Voice controls ready</p>
+      </article>
+    </section>
   </section>
 </section>
 

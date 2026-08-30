@@ -73,6 +73,8 @@ input:focus, select:focus, button:focus-visible {
   display: grid;
   grid-template-columns: 122px minmax(0, 1fr);
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   max-width: none;
   margin: 0;
   padding: 0;
@@ -159,7 +161,14 @@ input:focus, select:focus, button:focus-visible {
   box-shadow: 0 0 10px rgba(127, 196, 91, .65);
 }
 
-.app-shell { min-width: 0; }
+.app-shell {
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
 
 .topbar {
   position: sticky;
@@ -175,6 +184,8 @@ input:focus, select:focus, button:focus-visible {
   background: rgba(8, 8, 6, .95);
   backdrop-filter: blur(16px);
 }
+
+.app-shell > .topbar { position: relative; }
 
 .brand-lockup h1 { margin: 0; font-size: 22px; letter-spacing: .08em; white-space: nowrap; }
 .brand-lockup h1 span { color: var(--muted); font-weight: 400; }
@@ -196,8 +207,24 @@ input:focus, select:focus, button:focus-visible {
 .status { color: var(--gold-bright); font-size: 9px; font-weight: 800; letter-spacing: .12em; white-space: nowrap; }
 .hud-enter { white-space: nowrap; }
 
-.view { display: none; }
-.view.active { display: block; }
+#mainWorkspace {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view {
+  display: none !important;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.view.active { display: block !important; }
+.view[hidden] { display: none !important; }
+#liveView.active { display: grid !important; }
+#liveView:not(.active) { display: none !important; }
 
 #liveView {
   display: grid;

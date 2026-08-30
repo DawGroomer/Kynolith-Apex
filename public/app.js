@@ -1,5 +1,8 @@
 const $=id=>document.getElementById(id);let lastCue,lastState,recording,audioContext,sourceNode,processor,micStream,audioChunks=[],settings={},bindingController=false,bindingKeyboard=false,gamepadPressed=false,talkRequestId=0,voiceTurnId=0;const audioMetrics={requested:0,played:0,cancelled:0,dropped:0,failed:0,fallbacks:0,lastLatencyMs:0,maxLatencyMs:0};const audioLanes={coach:{sequence:0,abort:null,audio:null,context:null,url:null,cue:null,playing:false},spotter:{sequence:0,abort:null,audio:null,context:null,url:null,cue:null,playing:false}};window.apexAudioMetrics=audioMetrics;
+const dedicatedHud=new URLSearchParams(location.search).get("hud")==="1";
 let hudModeOverride=null;
+if(dedicatedHud)hudModeOverride="hud";
+let hudLocked=false;
 
 
 const socket=new WebSocket(`ws://${location.host}/live`);
@@ -25,11 +28,100 @@ function applyHudFieldVisibility(){
       ? settings.hudVisibleFields
       : []
   );
+  const dedicatedRequired=new Set(["speed","gear","rpm","throttle","brake","fuel","cue","voiceStatus"]);
 
   document.querySelectorAll("[data-hud-field]").forEach(element=>{
-    element.hidden=!visible.has(element.dataset.hudField);
+    element.hidden=!visible.has(element.dataset.hudField)&&!(dedicatedHud&&dedicatedRequired.has(element.dataset.hudField));
   });
 }
+
+const HUD_LAYOUT_KEY="apex-hud-layout-v1";
+const hudLayoutDefaults={
+  telemetry:{x:0,y:0,scale:1,visible:true},
+  "track-map":{x:0,y:0,scale:1,visible:true},
+  "lap-trace":{x:0,y:0,scale:1,visible:true},
+  coaching:{x:0,y:0,scale:1,visible:true},
+  voice:{x:0,y:0,scale:1,visible:true}
+};
+let hudLayout={...hudLayoutDefaults};
+try{
+  const stored=JSON.parse(localStorage.getItem(HUD_LAYOUT_KEY)||"null");
+  for(const [key,defaults] of Object.entries(hudLayoutDefaults)){
+    const item=stored?.[key];
+    if(!item||!Number.isFinite(item.x)||!Number.isFinite(item.y)||!Number.isFinite(item.scale))continue;
+    hudLayout[key]={
+      x:item.x,
+      y:item.y,
+      scale:Math.min(1.5,Math.max(.65,item.scale)),
+      visible:item.visible!==false
+    };
+  }
+}catch{}
+
+function applyHudLayout(){
+  document.querySelectorAll("[data-hud-module]").forEach(module=>{
+    const layout=hudLayout[module.dataset.hudModule];
+    if(!layout)return;
+    module.style.setProperty("--hud-x",`${layout.x}px`);
+    module.style.setProperty("--hud-y",`${layout.y}px`);
+    module.style.setProperty("--hud-scale",String(layout.scale));
+    module.hidden=layout.visible===false;
+  });
+}
+
+function saveHudLayout(){
+  try{localStorage.setItem(HUD_LAYOUT_KEY,JSON.stringify(hudLayout));}catch{}
+}
+
+function bindHudLayoutEditing(){
+  document.querySelectorAll("[data-hud-module]").forEach(module=>{
+    const key=module.dataset.hudModule;
+    const dragHandle=module.querySelector("[data-hud-drag-handle]");
+    const resizeHandle=module.querySelector(".hud-resize-handle");
+    dragHandle?.addEventListener("pointerdown",event=>{
+      if(hudLocked||event.target.closest(".hud-resize-handle")||event.target.closest("[data-hud-close]"))return;
+      event.preventDefault();
+      const startX=event.clientX,startY=event.clientY;
+      const start={...hudLayout[key]};
+      const move=moveEvent=>{
+        hudLayout[key]={...start,x:start.x+moveEvent.clientX-startX,y:start.y+moveEvent.clientY-startY};
+        applyHudLayout();
+      };
+      const finish=()=>{
+        window.removeEventListener("pointermove",move);
+        saveHudLayout();
+      };
+      window.addEventListener("pointermove",move);
+      window.addEventListener("pointerup",finish,{once:true});
+    });
+    resizeHandle?.addEventListener("pointerdown",event=>{
+      if(hudLocked)return;
+      event.preventDefault();
+      event.stopPropagation();
+      const startX=event.clientX,startScale=hudLayout[key].scale;
+      const move=moveEvent=>{
+        hudLayout[key]={...hudLayout[key],scale:Math.min(1.5,Math.max(.65,startScale+(moveEvent.clientX-startX)/240))};
+        applyHudLayout();
+      };
+      const finish=()=>{
+        window.removeEventListener("pointermove",move);
+        saveHudLayout();
+      };
+      window.addEventListener("pointermove",move);
+      window.addEventListener("pointerup",finish,{once:true});
+    });
+    module.querySelector("[data-hud-close]")?.addEventListener("click",event=>{
+      if(hudLocked)return;
+      event.stopPropagation();
+      hudLayout[key]={...hudLayout[key],visible:false};
+      applyHudLayout();
+      saveHudLayout();
+    });
+  });
+  applyHudLayout();
+}
+
+bindHudLayoutEditing();
 
 const PEDAL_GRAPH_MIN_FRAME_MS=1000/30;
 
@@ -123,6 +215,7 @@ function renderHud(s){
 
   $("hudFuel").textContent=
     `${(f.fuelLiters*.264172).toFixed(1)} gal`;
+  $("hudFuelMeter").style.width=`${Math.min(100,Math.max(0,f.fuelLiters/110*100))}%`;
 
   $("hudTire").textContent=
     `${Math.round(Math.max(...f.tireTempC)*1.8+32)} °F`;
@@ -141,6 +234,7 @@ function renderHud(s){
       : s.source==="simulator"
         ?"SIMULATOR ACTIVE"
       :"WAITING FOR LMU";
+  $("hudTelemetryState").textContent=s.source==="lmu"&&s.connected?"LMU LIVE":"SIMULATOR";
 
   if(s.lastCue){
     $("hudCue").textContent=s.lastCue.message;
@@ -154,20 +248,44 @@ function renderHud(s){
   applyHudFieldVisibility();
 }
 
-$("hudEnter").onclick=()=>{
+const desktopBridge=window.apexDesktop;
+function enterHud(){
+  if(desktopBridge?.openHud){
+    void desktopBridge.openHud();
+    return;
+  }
   hudModeOverride="hud";
   applyPresentationMode(lastState);
-};
-
-$("hudEnterPanel").onclick=()=>{
-  hudModeOverride="hud";
-  applyPresentationMode(lastState);
-};
-
-$("hudExit").onclick=()=>{
+}
+function exitHud(){
+  if(desktopBridge?.closeHud){
+    void desktopBridge.closeHud();
+    return;
+  }
   hudModeOverride="desktop";
   applyPresentationMode(lastState);
-};
+}
+
+$("hudEnter").onclick=enterHud;
+$("hudEnterPanel").onclick=enterHud;
+$("hudExit").onclick=exitHud;
+
+const hudLock=$("hudLock");
+const hudRestore=$("hudRestore");
+hudRestore?.addEventListener("click",()=>{
+  if(hudLocked)return;
+  for(const layout of Object.values(hudLayout))layout.visible=true;
+  applyHudLayout();
+  saveHudLayout();
+});
+hudLock?.addEventListener("click",()=>{
+  hudLocked=!hudLocked;
+  hudLock.textContent=hudLocked?"LOCKED // RACE":"UNLOCKED // EDIT";
+  document.body.classList.toggle("hud-locked",hudLocked);
+  void desktopBridge?.setHudLocked?.(hudLocked);
+});
+
+if(dedicatedHud)applyPresentationMode();
 
 function setText(id,value){const element=$(id);if(element)element.textContent=value}
 function render(s){const f=s.frame;if(!f)return;const speed=Math.round(f.speedKph*.621371),fuel=`${(f.fuelLiters*.264172).toFixed(1)} gal`,session=f.session.toUpperCase(),source=s.source.toUpperCase();setText("speed",speed);setText("gear",f.gear);setText("rpm",Math.round(f.rpm));setText("throttleValue",`${Math.round(f.throttle*100)}%`);setText("brakeValue",`${Math.round(f.brake*100)}%`);$("throttle").style.width=`${f.throttle*100}%`;$("brake").style.width=`${f.brake*100}%`;setText("fuel",fuel);$("fuelMeter").style.width=`${Math.min(100,Math.max(0,f.fuelLiters/110*100))}%`;setText("fuelHealth",fuel);setText("healthRpm",Math.round(f.rpm));setText("session",session);setText("summarySession",session);setText("barSession",session);setText("barTrack",f.track);setText("barVehicle",f.vehicle);setText("barConnection",s.source==="lmu"&&s.connected?"LMU CONNECTED":"SIMULATOR");setText("railConnection",s.source==="lmu"&&s.connected?"LMU":"SIM");setText("dashboardSource",source);setText("footerSource",source);setText("summarySource",source);setText("footerVoice",settings.voiceEngine==="system"?"WINDOWS SYSTEM":"LOCAL READY");setText("lap",f.lap);setText("position",`P${f.position} / C${f.classPosition}`);setText("gap",f.gapAheadSeconds==null?"—":`${f.gapAheadSeconds.toFixed(1)} s`);setText("tire",`${Math.round(Math.max(...f.tireTempC)*1.8+32)} °F`);setText("pressure",`${average(f.tirePressurePsi).toFixed(1)} PSI`);setText("source",source);setText("bestLap",formatTime(s.bestLapSeconds));setText("lastLap",formatTime(s.lastLapSeconds));setText("consistencyLive",s.consistencySeconds==null?"—":`±${s.consistencySeconds.toFixed(2)} s`);setText("hudPreviewSpeed",speed);setText("hudPreviewGear",f.gear);setText("hudPreviewRpm",`${Math.round(f.rpm)} RPM`);$("hudPreviewThrottle").style.width=`${f.throttle*100}%`;$("hudPreviewBrake").style.width=`${f.brake*100}%`;if(s.lastCue)setText("cue",s.lastCue.message)}
@@ -191,7 +309,30 @@ voiceButton.addEventListener("pointerdown",async e=>{e.preventDefault();e.stopIm
 const finishTalk=async()=>{if(!recording)return;recording=false;voiceButton.classList.remove("active");voiceButton.textContent="HOLD TO TALK";processor?.disconnect();sourceNode?.disconnect();micStream?.getTracks().forEach(t=>t.stop());const completedChunks=audioChunks;audioChunks=[];const responseId=voiceTurnId;const rate=audioContext.sampleRate;await audioContext.close();if(responseId!==voiceTurnId)return;let audio=mergeAudio(completedChunks);if(rate!==16000)audio=resample(audio,rate,16000);$("voiceState").textContent="Transcribing locally…";try{const transcription=await fetch("/api/local/transcribe",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:audio.buffer}).then(readJson);if(responseId!==voiceTurnId)return;if(!transcription.text){$("voiceState").textContent="I didn't catch that. Hold and try again.";return}$("voiceState").textContent=`You: ${transcription.text}`;const result=await fetch("/api/local/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:transcription.text})}).then(readJson);if(responseId!==voiceTurnId)return;$("cue").textContent=result.answer;$("voiceState").textContent=`Apex: ${result.answer}`;speak(result.answer)}catch(err){if(responseId!==voiceTurnId)return;$("voiceState").textContent=err.message}};
 voiceButton.addEventListener("pointerup",e=>{talkRequestId++;finishTalk(e)});voiceButton.addEventListener("pointercancel",e=>{talkRequestId++;finishTalk(e)});voiceButton.addEventListener("pointerleave",e=>{if(e.buttons===0){talkRequestId++;finishTalk(e)}});
 
-document.querySelectorAll(".nav").forEach(button=>button.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x===button));for(const name of["live","profile","review","race","setup","settings"])$(`${name}View`).classList.toggle("active",button.dataset.view===name);if(button.dataset.view==="profile")loadProfile();if(button.dataset.view==="review")loadSessions();if(button.dataset.view==="race")loadRaceSessions();if(button.dataset.view==="setup")loadSetupSessions();if(button.dataset.view==="settings")refreshDevices()});
+const viewNames=["live","profile","review","race","setup","settings"];
+let activeView=null;
+function setActiveView(view){
+  if(!viewNames.includes(view)||activeView===view)return;
+  activeView=view;
+  document.querySelectorAll(".nav").forEach(button=>button.classList.toggle("active",button.dataset.view===view));
+  for(const name of viewNames){
+    const element=$(`${name}View`);
+    if(!element)continue;
+    const active=name===view;
+    element.classList.toggle("active",active);
+    element.hidden=!active;
+    if(active)element.scrollTop=0;
+  }
+  const workspace=$("mainWorkspace");
+  if(workspace)workspace.scrollTop=0;
+  if(view==="profile")loadProfile();
+  if(view==="review")loadSessions();
+  if(view==="race")loadRaceSessions();
+  if(view==="setup")loadSetupSessions();
+  if(view==="settings")refreshDevices();
+}
+document.querySelectorAll(".nav").forEach(button=>button.onclick=()=>setActiveView(button.dataset.view));
+setActiveView("live");
 
 async function loadProfile(){const p=await fetch("/api/profile").then(readJson);$("profileName").textContent=`${p.driverName.toUpperCase()} // DRIVER PROFILE`;$("profileLevel").textContent=p.level.toUpperCase();$("profileEmpty").hidden=p.score!=null;$("profileContent").hidden=p.score==null;if(p.score==null){$("profileEmpty").textContent=`${p.currentFocus} ${p.dataQuality?.quarantinedSessions??0} session(s) are quarantined and preserved for review.`;return}$("profileScore").textContent=p.score.toFixed(1);$("profileProgress").style.width=`${p.score}%`;const previous=p.change==null?p.score:p.score-p.change;$("profileBaseline").style.left=`${Math.max(0,Math.min(100,previous))}%`;$("profileTrend").textContent=p.trend==="improved"?"You're moving forward":p.trend==="declined"?"We've lost a little ground":p.trend==="steady"?"Holding steady":"Baseline established";$("profileChange").textContent=p.change==null?"Complete another comparable trusted session to measure change.":`${p.change>=0?"+":""}${p.change.toFixed(1)} points versus your previous comparable trusted session.`;const quality=p.dataQuality??{},confidence=quality.scoreConfidence??"low";$("profileConfidence").textContent=`${confidence.toUpperCase()} CONFIDENCE`;$("profileConfidence").classList.toggle("trusted",confidence==="high");$("profileQuality").textContent=`${quality.trustedSessions??p.sessions} trusted • ${quality.limitedSessions??0} limited • ${quality.quarantinedSessions??0} quarantined • calibration ${String(quality.calibrationStatus??"uncalibrated").toUpperCase()}`;for(const key of["braking","throttle","consistency","pace"]){$(`${key}Score`).textContent=p.components[key].toFixed(1);$(`${key}Meter`).value=p.components[key]}$("profileFocus").textContent=p.currentFocus;$("profileStats").textContent=`${p.sessions} trusted sessions • ${p.completedLaps} trusted laps • ${p.personalBests} track/car baselines`;renderProgressChart(p.history);renderAcademy(p.academy)}
 $("newProfile").onclick=async()=>{
