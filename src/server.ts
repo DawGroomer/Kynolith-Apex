@@ -16,6 +16,9 @@ import { PedalGraphModel } from "./pedal-graph.js";
 import { selectPedalReference } from "./pedal-reference.js";
 import { TrackModelStore } from "./track-model-store.js";
 import { CornerDiagnosisAuthority, type CompletedCornerDiagnosis } from "./corner-diagnosis-authority.js";
+import { FactualCoachingAuthority } from "./factual-coaching-authority.js";
+import { claims } from "./factual-coaching-claim.js";
+import { cueForClaim } from "./factual-coaching-cue.js";
 import { applyRowdyCorner, applyTemper } from "./coach-personality.js";
 import { BoundedFramePipeline, type PipelineMetrics } from "./bounded-frame-pipeline.js";
 import { MINIMUM_CALIBRATION_LABELS, ScoreCalibrationStore, type ExpertLabel } from "./score-calibration.js";
@@ -76,6 +79,7 @@ let lastStrongLanguageAt = 0;
 let cachedAcademy = buildDriverProfile(settings.get().driverName, await recorder.list(), calibration.get()).academy;
 const cornerDiagnosisHistory: CompletedCornerDiagnosis[] = [];
 const cornerDiagnosisAuthority = new CornerDiagnosisAuthority();
+const factualCoachingAuthority = new FactualCoachingAuthority();
 let cornerDiagnosisSessionKey = "";
 const state: CoachState = { connected: false, source: "simulator", sessionActive: false, frame: null, lastCue: null, bestLapSeconds: null, lastLapSeconds: null, consistencySeconds: null };
 const pedalGraph = new PedalGraphModel();
@@ -393,6 +397,30 @@ async function processFrame(frame: TelemetryFrame): Promise<void> {
       cornerDiagnosisHistory.push(
         ...completed
       );
+
+      for (
+        const diagnosis
+        of completed
+      ) {
+        const factualDecisions =
+          factualCoachingAuthority.decisions(
+            diagnosis
+          );
+        const factualClaims =
+          claims(
+            factualDecisions
+          );
+
+        const factualCues =
+          factualClaims.map(
+            claim =>
+              cueForClaim(
+                claim,
+                claim.decision.diagnosis.completedAt
+              )
+          );
+        scheduler.enqueue(factualCues);
+      }
 
       if (
         cornerDiagnosisHistory.length >
