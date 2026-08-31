@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("apexDesktop", {
+  launchLmu: () => ipcRenderer.invoke("apex:launch-lmu"),
   openHud: () => ipcRenderer.invoke("apex:open-hud"),
   closeHud: () => ipcRenderer.invoke("apex:close-hud"),
   getHudDisplays: () => ipcRenderer.invoke("apex:get-hud-displays"),

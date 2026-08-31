@@ -3,11 +3,13 @@ const dedicatedHud=new URLSearchParams(location.search).get("hud")==="1";
 let hudModeOverride=null;
 if(dedicatedHud)hudModeOverride="hud";
 let hudLocked=false;
+let lmuLaunchPending=false;
+let lmuLaunchFeedback="";
 
 
 const socket=new WebSocket(`ws://${location.host}/live`);
 socket.onopen=()=>{$("status").textContent="APEX ONLINE // WAITING FOR LMU"};
-socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;render(m.state);renderHud(m.state);queuePedalGraphRender(m.pedalGraph);applyPresentationMode(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue)speakCue(m.cue)};
+socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;updateLmuLaunchControl(m.state);render(m.state);renderHud(m.state);queuePedalGraphRender(m.pedalGraph);applyPresentationMode(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue)speakCue(m.cue)};
 socket.onclose=()=>{$("status").textContent="OFFLINE"};
 
 function shouldUseHud(s){
@@ -248,6 +250,57 @@ function renderHud(s){
 }
 
 const desktopBridge=window.apexDesktop;
+function ensureLmuLaunchControl(){
+  const runtime=document.querySelector(".header-runtime");
+  if(!runtime||$("launchLmu"))return;
+  const button=document.createElement("button");
+  button.id="launchLmu";
+  button.type="button";
+  button.className="secondary launch-lmu";
+  const message=document.createElement("span");
+  message.id="launchLmuMessage";
+  message.className="launch-lmu-message";
+  message.setAttribute("aria-live","polite");
+  runtime.insertBefore(button,$("hudEnter"));
+  runtime.insertBefore(message,$("status"));
+  button.addEventListener("click",launchLmu);
+}
+function updateLmuLaunchControl(state=lastState){
+  ensureLmuLaunchControl();
+  const button=$("launchLmu"),message=$("launchLmuMessage");
+  if(!button)return;
+  const connected=state?.source==="lmu"&&state?.connected===true;
+  button.disabled=connected||lmuLaunchPending;
+  button.textContent=connected
+    ? state?.sessionActive ? "LMU TELEMETRY LIVE" : "LMU CONNECTED"
+    : lmuLaunchPending ? "STARTING LMU..." : "LAUNCH LMU";
+  if(message){
+    message.textContent=connected||lmuLaunchPending
+      ? connected ? "" : "Starting LMU through Steam..."
+      : lmuLaunchFeedback;
+  }
+}
+async function launchLmu(){
+  const button=$("launchLmu");
+  const connected=lastState?.source==="lmu"&&lastState?.connected===true;
+  if(!button||lmuLaunchPending||connected)return;
+  lmuLaunchFeedback="";
+  lmuLaunchPending=true;
+  updateLmuLaunchControl(lastState);
+  try{
+    if(!desktopBridge?.launchLmu)throw new Error("Desktop launcher unavailable");
+    const result=await desktopBridge.launchLmu();
+    lmuLaunchFeedback=result?.ok===false
+      ? result.message||"Unable to launch LMU through Steam."
+      : "Steam launch requested.";
+  }catch{
+    lmuLaunchFeedback="Unable to launch LMU through Steam.";
+  }finally{
+    lmuLaunchPending=false;
+    updateLmuLaunchControl(lastState);
+  }
+}
+updateLmuLaunchControl();
 function enterHud(){
   if(desktopBridge?.openHud){
     void desktopBridge.openHud();

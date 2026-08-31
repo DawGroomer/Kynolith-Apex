@@ -26,6 +26,7 @@ let quitting = false;
 let shutdownPromise;
 let shutdownComplete = false;
 let finalQuitRequested = false;
+const LMU_STEAM_URI = "steam://run/2399420";
 const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) app.quit();
@@ -283,6 +284,21 @@ function setHudControlsInteractive(interactive) {
 }
 
 ipcMain.handle("apex:open-hud", () => showHudWindow());
+ipcMain.handle("apex:launch-lmu", async () => {
+  try {
+    await shell.openExternal(LMU_STEAM_URI);
+    return { ok: true };
+  } catch (error) {
+    console.warn(
+      "Unable to launch LMU through Steam:",
+      error instanceof Error ? error.message : String(error)
+    );
+    return {
+      ok: false,
+      message: "Unable to launch LMU through Steam."
+    };
+  }
+});
 ipcMain.handle("apex:close-hud", () => closeHudWindow());
 ipcMain.handle("apex:set-hud-locked", (_event, locked) => setHudLocked(locked));
 ipcMain.handle("apex:get-hud-displays", async () => {
