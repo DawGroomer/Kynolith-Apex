@@ -20,6 +20,8 @@ let bridgeRestartTimer;
 let telemetryWatchdog;
 let updateCheckTimer;
 let lastPromptedUpdateVersion;
+let hudDisplayTarget = "primary-display";
+let hudDisplayModule;
 let quitting = false;
 let shutdownPromise;
 let shutdownComplete = false;
@@ -88,56 +90,101 @@ function scheduleUpdateChecks(server) {
   );
 }
 
-function isValidHudBounds(value) {
-  return (
-    value &&
-    Number.isFinite(value.x) &&
-    Number.isFinite(value.y) &&
-    Number.isFinite(value.width) &&
-    Number.isFinite(value.height) &&
-    value.width >= 640 &&
-    value.height >= 360
-  );
+async function getHudDisplayModule() {
+  if (!hudDisplayModule) {
+    hudDisplayModule = await import(
+      pathToFileURL(path.join(app.getAppPath(), "dist", "hud-display.js")).href
+    );
+  }
+  return hudDisplayModule;
 }
 
-function clampHudBounds(bounds, displayBounds) {
-  const width = Math.min(
-    Math.max(640, Math.round(bounds.width)),
-    displayBounds.width
-  );
-  const height = Math.min(
-    Math.max(360, Math.round(bounds.height)),
-    displayBounds.height
+function readSavedHudBounds() {
+  if (!hudBoundsPath) return undefined;
+
+  try {
+    return JSON.parse(readFileSync(hudBoundsPath, "utf8"));
+  }
+  catch {
+    return undefined;
+  }
+}
+
+function currentHudDisplays() {
+  return screen.getAllDisplays().map(display => ({
+    id: String(display.id),
+    bounds: { ...display.bounds }
+  }));
+}
+
+async function persistHudDisplayTarget(target) {
+  if (!hudServerPort) return;
+
+  try {
+    await fetch(`http://127.0.0.1:${hudServerPort}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hudDisplayTarget: target })
+    });
+  }
+  catch (error) {
+    console.warn(
+      "Apex HUD display fallback could not be persisted:",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+async function resolveHudSurface(useSavedBounds = true) {
+  const displayModule = await getHudDisplayModule();
+  const displays = currentHudDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const resolved = displayModule.resolveHudSurface(
+    displays,
+    hudDisplayTarget,
+    String(primary.id),
+    useSavedBounds ? readSavedHudBounds() : undefined
   );
 
+  if (resolved.fellBack) {
+    hudDisplayTarget = resolved.target;
+    mainWindow?.webContents.send("apex:hud-display-fallback", {
+      target: resolved.target,
+      message: "Saved HUD display is unavailable. Using the primary display."
+    });
+    void persistHudDisplayTarget(resolved.target);
+  }
+
   return {
-    width,
-    height,
-    x: Math.max(
-      displayBounds.x,
-      Math.min(bounds.x, displayBounds.x + displayBounds.width - width)
-    ),
-    y: Math.max(
-      displayBounds.y,
-      Math.min(bounds.y, displayBounds.y + displayBounds.height - height)
-    )
+    ...resolved,
+    displays,
+    options: displayModule.enumerateHudDisplays(displays, String(primary.id))
   };
 }
 
-function loadHudBounds(fallback, displayBounds) {
-  if (hudBoundsPath) {
-    try {
-      const saved = JSON.parse(readFileSync(hudBoundsPath, "utf8"));
-      if (isValidHudBounds(saved)) {
-        return clampHudBounds(saved, displayBounds);
-      }
-    }
-    catch {
-      // A missing or malformed layout file falls back to the current display.
+async function loadHudDisplayTarget() {
+  if (!hudServerPort) return;
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${hudServerPort}/api/settings`);
+    if (!response.ok) return;
+    const settings = await response.json();
+    if (typeof settings.hudDisplayTarget === "string") {
+      hudDisplayTarget = settings.hudDisplayTarget;
     }
   }
+  catch {
+    // The primary display remains the safe in-memory default.
+  }
+}
 
-  return fallback;
+async function applyHudDisplayTarget() {
+  const resolved = await resolveHudSurface(false);
+  if (hudWindow && !hudWindow.isDestroyed()) {
+    hudWindow.setBounds(resolved.bounds);
+    scheduleHudBoundsSave();
+  }
+  return resolved;
 }
 
 function saveHudBounds() {
@@ -167,12 +214,11 @@ function scheduleHudBoundsSave() {
 }
 
 async function showHudWindow() {
+  await loadHudDisplayTarget();
   if (!hudWindow || hudWindow.isDestroyed()) {
     const appRoot = app.getAppPath();
     const appIconPath = path.join(appRoot, "public", "assets", "ApexLogo.ico");
-    const display = screen.getPrimaryDisplay();
-    const fallbackBounds = display.bounds;
-    const bounds = loadHudBounds(fallbackBounds, display.bounds);
+    const { bounds } = await resolveHudSurface(true);
     hudWindow = new BrowserWindow({
       ...bounds,
       minWidth: 640,
@@ -206,7 +252,7 @@ async function showHudWindow() {
     await hudWindow.loadURL(`http://127.0.0.1:${hudServerPort}/?hud=1`);
   }
 
-  hudWindow.setAlwaysOnTop(true, "floating");
+  hudWindow.setAlwaysOnTop(true, "screen-saver");
   setHudLocked(false);
   hudWindow.setIgnoreMouseEvents(false);
   hudWindow.show();
@@ -239,6 +285,16 @@ function setHudControlsInteractive(interactive) {
 ipcMain.handle("apex:open-hud", () => showHudWindow());
 ipcMain.handle("apex:close-hud", () => closeHudWindow());
 ipcMain.handle("apex:set-hud-locked", (_event, locked) => setHudLocked(locked));
+ipcMain.handle("apex:get-hud-displays", async () => {
+  await loadHudDisplayTarget();
+  return resolveHudSurface(true);
+});
+ipcMain.handle("apex:set-hud-display-target", async (_event, target) => {
+  hudDisplayTarget = typeof target === "string" && target.trim()
+    ? target.trim().slice(0, 80)
+    : "primary-display";
+  return applyHudDisplayTarget();
+});
 ipcMain.handle(
   "apex:set-hud-controls-interactive",
   (_event, interactive) => setHudControlsInteractive(Boolean(interactive))
@@ -271,6 +327,13 @@ async function createWindow() {
     )
   });
   startTelemetryBridge(coachServer);
+
+  const refreshHudSurface = () => {
+    if (hudWindow && !hudWindow.isDestroyed()) void applyHudDisplayTarget();
+  };
+  screen.on("display-added", refreshHudSurface);
+  screen.on("display-removed", refreshHudSurface);
+  screen.on("display-metrics-changed", refreshHudSurface);
 
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(permission === "media");

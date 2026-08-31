@@ -158,7 +158,13 @@ test(
       screen: {
         getPrimaryDisplay(): { bounds: { x: number; y: number; width: number; height: number } } {
           return { bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
-        }
+        },
+        getAllDisplays(): Array<{ id: number; bounds: { x: number; y: number; width: number; height: number } }> {
+          return [
+            { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
+          ];
+        },
+        on(): void {}
       },
       session: {
         defaultSession: {

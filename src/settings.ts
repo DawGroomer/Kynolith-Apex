@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { PRIMARY_DISPLAY_TARGET } from "./hud-display.js";
 
 export type SpeechFrequency = "quiet" | "balanced" | "active";
 
@@ -72,6 +73,7 @@ export interface CoachSettings {
   autoCheckUpdates: boolean;
   autoHudMode: boolean;
   hudAlwaysOnTop: boolean;
+  hudDisplayTarget: string;
   hudVisibleFields: HudField[];
 }
 
@@ -87,6 +89,7 @@ export const defaultSettings: CoachSettings = {
   autoCheckUpdates: false,
   autoHudMode: true,
   hudAlwaysOnTop: false,
+  hudDisplayTarget: PRIMARY_DISPLAY_TARGET,
   hudVisibleFields: [...defaultHudVisibleFields]
 };
 
@@ -148,6 +151,9 @@ function normalize(value: CoachSettings): CoachSettings {
     autoCheckUpdates: value.autoCheckUpdates === true,
     autoHudMode: value.autoHudMode !== false,
     hudAlwaysOnTop: value.hudAlwaysOnTop === true,
+    hudDisplayTarget: typeof value.hudDisplayTarget === "string" && value.hudDisplayTarget.trim()
+      ? value.hudDisplayTarget.trim().slice(0, 80)
+      : PRIMARY_DISPLAY_TARGET,
     hudVisibleFields: normalizeHudFields(value.hudVisibleFields)
   };
 }

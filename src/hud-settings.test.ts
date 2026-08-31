@@ -20,6 +20,7 @@ test("HUD preferences have safe defaults and persist", async () => {
 
     assert.equal(defaults.autoHudMode, true);
     assert.equal(defaults.hudAlwaysOnTop, false);
+    assert.equal(defaults.hudDisplayTarget, "primary-display");
 
     assert.deepEqual(
       defaults.hudVisibleFields,
@@ -38,6 +39,7 @@ test("HUD preferences have safe defaults and persist", async () => {
     const updated = await store.update({
       autoHudMode: false,
       hudAlwaysOnTop: true,
+      hudDisplayTarget: "22",
       hudVisibleFields: [
         "gear",
         "fuel",
@@ -48,6 +50,7 @@ test("HUD preferences have safe defaults and persist", async () => {
 
     assert.equal((updated as any).autoHudMode, false);
     assert.equal((updated as any).hudAlwaysOnTop, true);
+    assert.equal((updated as any).hudDisplayTarget, "22");
 
     assert.deepEqual(
       (updated as any).hudVisibleFields,
@@ -61,6 +64,7 @@ test("HUD preferences have safe defaults and persist", async () => {
 
     assert.equal(persisted.autoHudMode, false);
     assert.equal(persisted.hudAlwaysOnTop, true);
+    assert.equal(persisted.hudDisplayTarget, "22");
 
     assert.deepEqual(
       persisted.hudVisibleFields,

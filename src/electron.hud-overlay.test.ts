@@ -6,11 +6,12 @@ import test from "node:test";
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 
 test("Electron HUD is a native transparent click-through overlay", async () => {
-  const [main, app, html, hudCss] = await Promise.all([
+  const [main, app, html, hudCss, preload] = await Promise.all([
     readFile(path.join(repositoryRoot, "electron/main.cjs"), "utf8"),
     readFile(path.join(repositoryRoot, "public/app.js"), "utf8"),
     readFile(path.join(repositoryRoot, "public/index.html"), "utf8"),
     readFile(path.join(repositoryRoot, "public/hud.css"), "utf8"),
+    readFile(path.join(repositoryRoot, "electron/preload.cjs"), "utf8")
   ]);
 
   assert.match(main, /transparent:\s*true/);
@@ -18,6 +19,9 @@ test("Electron HUD is a native transparent click-through overlay", async () => {
   assert.match(main, /alwaysOnTop:\s*true/);
   assert.match(main, /backgroundColor:\s*["']#00000000["']/);
   assert.match(main, /setIgnoreMouseEvents\(/);
+  assert.match(main, /screen\.getAllDisplays\(\)/);
+  assert.match(main, /apex:get-hud-displays/);
+  assert.match(main, /apex:set-hud-display-target/);
   assert.match(main, /getBounds\(\)/);
   assert.match(main, /"moved"/);
   assert.match(main, /"resized"/);
@@ -32,8 +36,12 @@ test("Electron HUD is a native transparent click-through overlay", async () => {
   assert.match(app, /data-hud-close/);
   assert.match(app, /visible:false/);
   assert.match(app, /hudRestore/);
+  assert.match(preload, /getHudDisplays/);
+  assert.match(preload, /setHudDisplayTarget/);
   assert.match(html, /id="hudLock"/);
   assert.match(html, /id="hudRestore"/);
+  assert.match(html, /id="hudDisplayTarget"/);
+  assert.match(html, /Span All Displays/);
   assert.equal((html.match(/data-hud-module=/g) ?? []).length, 5);
   assert.equal((html.match(/hud-resize-handle/g) ?? []).length, 5);
   assert.equal((html.match(/data-hud-close/g) ?? []).length, 5);
@@ -58,4 +66,20 @@ test("locked HUD keeps close controls interactive without disabling click-throug
     /module\.querySelector\("\[data-hud-close\]"\)\?\.addEventListener\("click",event=>\{\s*if\(hudLocked\)return;/
   );
   assert.match(hudCss, /hud-locked \.hud-close[\s\S]*pointer-events:\s*auto/);
+});
+
+test("HUD uses the stronger Windows overlay level for game foreground", async () => {
+  const main = await readFile(
+    path.join(repositoryRoot, "electron/main.cjs"),
+    "utf8"
+  );
+
+  assert.match(
+    main,
+    /hudWindow\.setAlwaysOnTop\(true,\s*["']screen-saver["']\)/
+  );
+  assert.doesNotMatch(
+    main,
+    /hudWindow\.setAlwaysOnTop\(true,\s*["']floating["']\)/
+  );
 });
