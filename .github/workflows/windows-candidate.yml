@@ -31,7 +31,15 @@ jobs:
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 9.0.317
+
+      - name: Verify .NET SDK 9.0.317
+        shell: pwsh
+        run: |
+          $dotnetVersion = (dotnet --version).Trim()
+          if ($dotnetVersion -ne "9.0.317") {
+            throw "Expected .NET SDK 9.0.317, got $dotnetVersion"
+          }
 
       - name: Verify source provenance
         shell: pwsh
@@ -82,12 +90,17 @@ jobs:
           $setups = @(Get-ChildItem release -Filter "*-setup.exe" -File)
           if ($setups.Count -ne 1) { throw "Expected exactly one setup artifact, found $($setups.Count)" }
           if ($setups[0].Name -ne $expected) { throw "Unexpected setup artifact: $($setups[0].Name)" }
+          $dotnetVersion = (dotnet --version).Trim()
+          if ($dotnetVersion -ne "9.0.317") {
+            throw "Expected .NET SDK 9.0.317, got $dotnetVersion"
+          }
           $hash = (Get-FileHash $setups[0].FullName -Algorithm SHA256).Hash
           $sig = Get-AuthenticodeSignature $setups[0].FullName
           [ordered]@{
             sourceSha = (git rev-parse HEAD).Trim()
             packageVersion = $package.version
             setupFilename = $setups[0].Name
+            setupSizeBytes = [Int64]$setups[0].Length
             setupSha256 = $hash
             authenticodeStatus = $sig.Status.ToString()
             modelSourceLockSha256 = (Get-FileHash config/bundled-model-sources.json -Algorithm SHA256).Hash
@@ -100,7 +113,7 @@ jobs:
             kokoroRevision = "73d73390d733dc015140aae0ccd665e54088a30d"
             nodeVersion = node --version
             pnpmVersion = pnpm --version
-            dotnetVersion = dotnet --version
+            dotnetVersion = $dotnetVersion
             runner = "${{ runner.os }} / ${{ runner.image }}"
           } | ConvertTo-Json | Set-Content candidate-provenance.json
 

@@ -133,3 +133,28 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.doesNotMatch(workflow, /release\/create|gh\s+release\s+publish/i);
   assert.doesNotMatch(workflow, /^\s*(push|pull_request|schedule):/m);
 });
+
+test("candidate provenance records the actual setup byte size", () => {
+  const workflow = readFileSync(workflowPath, "utf8");
+
+  assert.match(
+    workflow,
+    /setupSizeBytes\s*=\s*\[Int64\]\s*\$setups\[0\]\.Length/
+  );
+});
+
+test("candidate workflow pins the exact .NET SDK authority", () => {
+  const globalPath = path.join(repositoryRoot, "global.json");
+  const workflow = readFileSync(workflowPath, "utf8");
+
+  assert.ok(
+    existsSync(globalPath),
+    "global.json must pin the candidate .NET SDK"
+  );
+
+  const globalConfig = JSON.parse(readFileSync(globalPath, "utf8"));
+  assert.match(workflow, /dotnet-version:\s*9\.0\.317/);
+  assert.match(workflow, /Expected \.NET SDK 9\.0\.317/);
+  assert.equal(globalConfig.sdk?.version, "9.0.317");
+  assert.equal(globalConfig.sdk?.rollForward, "disable");
+});
