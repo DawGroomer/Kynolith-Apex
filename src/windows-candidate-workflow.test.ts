@@ -81,7 +81,55 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.match(workflow, /github\.sha/);
   assert.match(workflow, /source.*SHA|SHA.*source/i);
   assert.match(workflow, /model.*revision|revision.*provenance/i);
-  assert.match(workflow, /upload-artifact@v4/);
+  assert.match(
+    workflow,
+    /permissions:\s*\r?\n\s+contents:\s*write/
+  );
+  assert.match(
+    workflow,
+    /persist-credentials:\s*false/
+  );
+  assert.doesNotMatch(workflow, /actions\/upload-artifact@v4/);
+  assert.match(
+    workflow,
+    /DawGroomer\/Kynolith-Apex-Candidate-Build/
+  );
+  assert.match(workflow, /visibility.*private|private.*visibility/i);
+  assert.match(workflow, /github\.run_id/);
+  assert.match(workflow, /candidate-\$\{\{\s*github\.run_id\s*\}\}/);
+  assert.match(workflow, /github\.sha/);
+  assert.match(workflow, /gh\s+(api|release)/);
+  assert.match(workflow, /--draft/);
+  assert.match(
+    workflow,
+    /Kynolith-Apex-LMU-Coach-.*-setup\.exe/
+  );
+  assert.match(workflow, /candidate-provenance\.json/);
+  assert.match(workflow, /--latest[=\s]+false|latest.*false/i);
+  assert.doesNotMatch(workflow, /--publish\s+(true|always)|--latest[=\s]+true/i);
+  const uploadStepIndex = workflow.indexOf(
+    "name: Upload internal draft candidate"
+  );
+  assert.ok(
+    uploadStepIndex >= 0,
+    "private draft candidate upload step must exist"
+  );
+  const uploadStep = workflow.slice(uploadStepIndex);
+  assert.match(uploadStep, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+  assert.match(uploadStep, /--target\s+\$env:GITHUB_SHA/);
+  assert.match(uploadStep, /--draft/);
+  assert.match(uploadStep, /--latest=false/);
+  assert.match(uploadStep, /INTERNAL APEX CANDIDATE/);
+  assert.match(uploadStep, /UNSIGNED/);
+  assert.match(uploadStep, /NOT FOR PUBLIC DISTRIBUTION/);
+  assert.match(uploadStep, /DawGroomer\/Kynolith-Apex-Candidate-Build/);
+  assert.match(uploadStep, /visibility/);
+  assert.match(uploadStep, /private/);
+  assert.doesNotMatch(
+    workflow.slice(0, uploadStepIndex),
+    /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/
+  );
   assert.doesNotMatch(workflow, /action-gh-release|softprops\/action-gh-release/);
+  assert.doesNotMatch(workflow, /release\/create|gh\s+release\s+publish/i);
   assert.doesNotMatch(workflow, /^\s*(push|pull_request|schedule):/m);
 });

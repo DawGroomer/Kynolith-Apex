@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   candidate:
@@ -15,6 +15,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup pnpm 10
         uses: pnpm/action-setup@v4
@@ -103,11 +104,45 @@ jobs:
             runner = "${{ runner.os }} / ${{ runner.image }}"
           } | ConvertTo-Json | Set-Content candidate-provenance.json
 
-      - name: Upload internal candidate only
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kynolith-Apex-LMU-Coach-candidate-${{ github.run_number }}
-          path: |
-            release/Kynolith-Apex-LMU-Coach-*-setup.exe
-            candidate-provenance.json
-          retention-days: 7
+      - name: Upload internal draft candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: candidate-${{ github.run_id }}
+        run: |
+          $expectedRepository = "DawGroomer/Kynolith-Apex-Candidate-Build"
+          $repository = $env:GITHUB_REPOSITORY
+          if ($repository -ne $expectedRepository) {
+            throw "Refusing candidate upload from repository $repository"
+          }
+
+          $visibility = (gh api "repos/$repository" --jq ".visibility").Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to verify repository visibility for $repository"
+          }
+          if ($visibility -ne "private") {
+            throw "Refusing candidate upload because repository visibility is $visibility"
+          }
+
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $expected = "Kynolith-Apex-LMU-Coach-$($package.version)-setup.exe"
+          $setups = @(Get-ChildItem release -Filter "*-setup.exe" -File)
+          if ($setups.Count -ne 1) {
+            throw "Expected exactly one setup artifact, found $($setups.Count)"
+          }
+          if ($setups[0].Name -ne $expected) {
+            throw "Unexpected setup artifact: $($setups[0].Name)"
+          }
+          if (-not (Test-Path -LiteralPath "candidate-provenance.json" -PathType Leaf)) {
+            throw "candidate-provenance.json is required"
+          }
+
+          gh release create $env:CANDIDATE_TAG `
+            $setups[0].FullName `
+            candidate-provenance.json `
+            --repo $repository `
+            --target $env:GITHUB_SHA `
+            --title "INTERNAL APEX CANDIDATE $env:CANDIDATE_TAG - UNSIGNED" `
+            --notes "INTERNAL APEX CANDIDATE. UNSIGNED. NOT FOR PUBLIC DISTRIBUTION." `
+            --draft `
+            --latest=false
