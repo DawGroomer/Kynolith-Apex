@@ -10,7 +10,6 @@ import {
   rm,
   stat
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -27,6 +26,7 @@ const runtimeManifestPath = path.join(
   "bundled-model-manifest.json"
 );
 const offlineModelsPath = path.join(repositoryRoot, "offline-models");
+const bundleParent = path.dirname(offlineModelsPath);
 
 function safeRelative(value, field) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -164,7 +164,9 @@ async function main() {
     stagedPaths.add(stagedPath);
   }
 
-  const stageRoot = await mkdtemp(path.join(tmpdir(), "apex-models-"));
+  const stageRoot = await mkdtemp(
+    path.join(bundleParent, ".apex-models-stage-")
+  );
   try {
     for (const entry of lock.sources) await download(entry, stageRoot);
 
@@ -179,18 +181,33 @@ async function main() {
     }
     await validateRuntimeManifest(stageRoot);
 
-    const backupRoot = await mkdtemp(path.join(tmpdir(), "apex-models-old-"));
+    const backupRoot = await mkdtemp(
+      path.join(bundleParent, ".apex-models-old-")
+    );
     const oldRoot = path.join(backupRoot, "offline-models");
     let movedOld = false;
+    let preserveBackup = false;
     try {
       await rename(offlineModelsPath, oldRoot);
       movedOld = true;
       await rename(stageRoot, offlineModelsPath);
     } catch (error) {
-      if (movedOld) await rename(oldRoot, offlineModelsPath);
+      if (movedOld) {
+        try {
+          await rename(oldRoot, offlineModelsPath);
+        } catch (restoreError) {
+          preserveBackup = true;
+          throw new AggregateError(
+            [error, restoreError],
+            "Model bundle replacement and restoration both failed"
+          );
+        }
+      }
       throw error;
     } finally {
-      await rm(backupRoot, { recursive: true, force: true });
+      if (!preserveBackup) {
+        await rm(backupRoot, { recursive: true, force: true });
+      }
     }
     console.log("Acquired and validated 70 pinned files plus README.");
   } finally {

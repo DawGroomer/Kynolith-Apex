@@ -27,6 +27,23 @@ test("model acquisition is pinned, streamed, validated, and fail-closed", () => 
     /import\s*\{[^}]*copyFile[^}]*\}\s*from\s+["']node:fs["']/,
     "callback-style copyFile must not be imported"
   );
+  assert.match(script, /const bundleParent = path\.dirname\(offlineModelsPath\)/);
+  assert.equal(
+    script.match(/mkdtemp\(\s*path\.join\(bundleParent,/g)?.length,
+    2,
+    "staging and backup roots must both be under the bundle parent"
+  );
+  assert.doesNotMatch(
+    script,
+    /mkdtemp\(path\.join\(tmpdir\(\)/,
+    "swap paths must not derive from os.tmpdir()"
+  );
+  assert.match(script, /let movedOld = false/);
+  assert.match(
+    script,
+    /if \(movedOld\)[\s\S]*rename\(oldRoot, offlineModelsPath\)/,
+    "failed replacement must attempt to restore the original bundle"
+  );
   assert.match(script, /bundled-model-sources\.json/);
   assert.match(script, /sha256|SHA-256|createHash\(["']sha256/i);
   assert.match(script, /temporary|temp/i);
