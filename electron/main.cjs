@@ -21,6 +21,9 @@ let telemetryWatchdog;
 let updateCheckTimer;
 let lastPromptedUpdateVersion;
 let quitting = false;
+let shutdownPromise;
+let shutdownComplete = false;
+let finalQuitRequested = false;
 const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) app.quit();
@@ -311,8 +314,9 @@ function startTelemetryBridge(server) {
     : path.join(app.getAppPath(), "bridge", "publish", "Kynolith.LmuBridge.exe");
   let lastFrameAt = 0;
   let disconnectReported = false;
-  bridgeProcess = spawn(executable, [], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-  const lines = readline.createInterface({ input: bridgeProcess.stdout });
+  const child = spawn(executable, [], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  bridgeProcess = child;
+  const lines = readline.createInterface({ input: child.stdout });
   lines.on("line", line => {
     try {
       const frame = JSON.parse(line);
@@ -322,7 +326,7 @@ function startTelemetryBridge(server) {
       server.ingestTelemetry(frame);
     } catch { /* Ignore partial or diagnostic output; bridge reconnects independently. */ }
   });
-  bridgeProcess.stderr.on("data", chunk => {
+  child.stderr.on("data", chunk => {
     writeBridgeDiagnostic(process.stderr, `[LMU bridge] ${chunk}`);
   });
   telemetryWatchdog = setInterval(() => {
@@ -340,14 +344,93 @@ function startTelemetryBridge(server) {
     if (health.restart) {
       console.warn("Telemetry bridge stalled; restarting to self-heal.");
       clearInterval(telemetryWatchdog);
-      bridgeProcess?.kill();
+      child.kill();
     }
   }, 1000);
-  bridgeProcess.on("exit", () => {
+  child.on("exit", () => {
     clearInterval(telemetryWatchdog);
-    server.disconnectTelemetry().catch(() => {});
-    if (!quitting) bridgeRestartTimer = setTimeout(() => startTelemetryBridge(server), 2000);
+    if (bridgeProcess === child) bridgeProcess = undefined;
+    if (!quitting) {
+      server.disconnectTelemetry().catch(() => {});
+      bridgeRestartTimer = setTimeout(() => startTelemetryBridge(server), 2000);
+    }
   });
+}
+
+function waitForBridgeExit(child) {
+  return new Promise(resolve => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      console.warn("Apex bridge did not exit before the shutdown timeout.");
+      settle();
+    }, 5000);
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.removeListener("exit", settle);
+      if (bridgeProcess === child) bridgeProcess = undefined;
+      resolve();
+    };
+
+    if (
+      (child.exitCode !== null && child.exitCode !== undefined) ||
+      (child.signalCode !== null && child.signalCode !== undefined)
+    ) {
+      settle();
+      return;
+    }
+
+    child.once("exit", settle);
+    try {
+      child.kill();
+    }
+    catch (error) {
+      console.warn(
+        "Apex bridge termination request failed:",
+        error instanceof Error ? error.message : String(error)
+      );
+      settle();
+    }
+  });
+}
+
+function requestShutdown() {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    quitting = true;
+    clearTimeout(bridgeRestartTimer);
+    clearInterval(telemetryWatchdog);
+    clearInterval(updateCheckTimer);
+    clearTimeout(hudBoundsSaveTimer);
+    hudBoundsSaveTimer = undefined;
+    globalShortcut.unregisterAll();
+    saveHudBounds();
+    if (hudWindow && !hudWindow.isDestroyed()) hudWindow.destroy();
+    hudWindow = undefined;
+
+    const child = bridgeProcess;
+    const bridgeShutdown = child
+      ? waitForBridgeExit(child)
+      : Promise.resolve();
+    const server = coachServer;
+    const serverShutdown = server
+      ? Promise.resolve()
+        .then(() => server.close())
+        .catch(error => {
+          console.warn(
+            "Apex server shutdown failed:",
+            error instanceof Error ? error.message : String(error)
+          );
+        })
+      : Promise.resolve();
+
+    await Promise.all([bridgeShutdown, serverShutdown]);
+    shutdownComplete = true;
+  })();
+
+  return shutdownPromise;
 }
 
 app.whenReady().then(createWindow).catch(error => {
@@ -356,16 +439,13 @@ app.whenReady().then(createWindow).catch(error => {
 });
 
 app.on("window-all-closed", () => app.quit());
-app.on("before-quit", () => {
-  quitting = true;
-  clearTimeout(bridgeRestartTimer);
-  clearInterval(telemetryWatchdog);
-  clearInterval(updateCheckTimer);
-  clearTimeout(hudBoundsSaveTimer);
-  hudBoundsSaveTimer = undefined;
-  globalShortcut.unregisterAll();
-  saveHudBounds();
-  hudWindow?.destroy();
-  bridgeProcess?.kill();
-  coachServer?.close().catch(() => {});
+app.on("before-quit", event => {
+  if (finalQuitRequested) return;
+
+  event.preventDefault();
+  void requestShutdown().then(() => {
+    if (finalQuitRequested || !shutdownComplete) return;
+    finalQuitRequested = true;
+    app.quit();
+  });
 });
