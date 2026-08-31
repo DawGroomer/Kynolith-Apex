@@ -16,12 +16,10 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
 
-      - name: Verify source provenance
-        shell: pwsh
-        run: |
-          $actual = (git rev-parse HEAD).Trim()
-          if ($actual -ne "${{ github.sha }}") { throw "Checked out $actual instead of ${{ github.sha }}" }
-          "Apex source SHA: $actual" | Out-File -FilePath source-provenance.txt
+      - name: Setup pnpm 10
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -29,15 +27,17 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Setup pnpm 10
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
+
+      - name: Verify source provenance
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne "${{ github.sha }}") { throw "Checked out $actual instead of ${{ github.sha }}" }
+          "Apex source SHA: $actual" | Out-File -FilePath source-provenance.txt
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

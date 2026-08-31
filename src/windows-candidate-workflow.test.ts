@@ -24,6 +24,19 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.match(workflow, /actions\/checkout@v4/);
   assert.match(workflow, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
 
+  const pnpmSetupIndex = workflow.indexOf("uses: pnpm/action-setup@v4");
+  const nodeSetupIndex = workflow.indexOf("uses: actions/setup-node@v4");
+  assert.ok(pnpmSetupIndex >= 0, "pnpm/action-setup must be configured");
+  assert.ok(nodeSetupIndex >= 0, "actions/setup-node must be configured");
+  assert.ok(
+    pnpmSetupIndex < nodeSetupIndex,
+    "pnpm setup must precede setup-node pnpm cache initialization"
+  );
+  assert.match(workflow, /version:\s*10/);
+  assert.match(workflow, /node-version:\s*22/);
+  assert.match(workflow, /cache:\s*pnpm/);
+  assert.match(workflow, /pnpm install --frozen-lockfile/);
+
   assert.match(workflow, /bundled-model-sources\.json/);
   assert.match(workflow, /onnx-community\/whisper-tiny\.en/);
   assert.match(
