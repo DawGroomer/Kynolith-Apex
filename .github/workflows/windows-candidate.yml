@@ -1,0 +1,113 @@
+name: Windows candidate installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact dispatch commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Verify source provenance
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne "${{ github.sha }}") { throw "Checked out $actual instead of ${{ github.sha }}" }
+          "Apex source SHA: $actual" | Out-File -FilePath source-provenance.txt
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup pnpm 10
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Acquire pinned model bundle
+        run: node scripts/acquire-models.mjs
+
+      - name: Fail closed with no cache fallback
+        run: Write-Output "Pinned model acquisition has no cache fallback"
+
+      - name: Verify model revision provenance, source lock, and runtime manifest
+        shell: pwsh
+        run: |
+          $lock = Get-Content config/bundled-model-sources.json -Raw | ConvertFrom-Json
+          if (@($lock.sources).Count -ne 70) { throw "Expected 70 pinned model files" }
+          pnpm validate:packaging
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Validate packaging
+        run: pnpm validate:packaging
+
+      - name: Build bridge
+        run: pnpm build:bridge
+
+      - name: Build NSIS candidate
+        run: pnpm dist:win
+
+      - name: Verify canonical setup artifact
+        shell: pwsh
+        run: |
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $expected = "Kynolith-Apex-LMU-Coach-$($package.version)-setup.exe"
+          $setups = @(Get-ChildItem release -Filter "*-setup.exe" -File)
+          if ($setups.Count -ne 1) { throw "Expected exactly one setup artifact, found $($setups.Count)" }
+          if ($setups[0].Name -ne $expected) { throw "Unexpected setup artifact: $($setups[0].Name)" }
+          $hash = (Get-FileHash $setups[0].FullName -Algorithm SHA256).Hash
+          $sig = Get-AuthenticodeSignature $setups[0].FullName
+          [ordered]@{
+            sourceSha = (git rev-parse HEAD).Trim()
+            packageVersion = $package.version
+            setupFilename = $setups[0].Name
+            setupSha256 = $hash
+            authenticodeStatus = $sig.Status.ToString()
+            modelSourceLockSha256 = (Get-FileHash config/bundled-model-sources.json -Algorithm SHA256).Hash
+            runtimeManifestSha256 = (Get-FileHash config/bundled-model-manifest.json -Algorithm SHA256).Hash
+            whisperRepository = "onnx-community/whisper-tiny.en"
+            whisperRevision = "3a6d57ee9c665610614068e8592d8baee0188181"
+            qwenRepository = "onnx-community/Qwen3-0.6B-ONNX"
+            qwenRevision = "da1453100cf3ff33ef56d17983fc7a8648706db6"
+            kokoroRepository = "onnx-community/Kokoro-82M-v1.0-ONNX"
+            kokoroRevision = "73d73390d733dc015140aae0ccd665e54088a30d"
+            nodeVersion = node --version
+            pnpmVersion = pnpm --version
+            dotnetVersion = dotnet --version
+            runner = "${{ runner.os }} / ${{ runner.image }}"
+          } | ConvertTo-Json | Set-Content candidate-provenance.json
+
+      - name: Upload internal candidate only
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kynolith-Apex-LMU-Coach-candidate-${{ github.run_number }}
+          path: |
+            release/Kynolith-Apex-LMU-Coach-*-setup.exe
+            candidate-provenance.json
+          retention-days: 7
