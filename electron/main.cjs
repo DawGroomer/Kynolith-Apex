@@ -193,6 +193,11 @@ async function showHudWindow() {
         preload: path.join(appRoot, "electron", "preload.cjs")
       }
     });
+    hudWindow.on("close", event => {
+      if (quitting) return;
+      event.preventDefault();
+      app.quit();
+    });
     hudWindow.on("closed", () => {
       hudWindow = undefined;
     });

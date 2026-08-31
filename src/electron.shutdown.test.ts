@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -255,3 +256,23 @@ test(
     }
   }
 );
+
+test("native HUD close quits Apex while in-app close returns to the dashboard", async () => {
+  const main = await readFile(mainPath, "utf8");
+  assert.match(
+    main,
+    /hudWindow\.on\("close", event => \{[\s\S]*?if \(quitting\) return;[\s\S]*?event\.preventDefault\(\);[\s\S]*?app\.quit\(\);[\s\S]*?\}\);/,
+    "native HUD close must route through the application quit lifecycle"
+  );
+
+  const closeHudStart = main.indexOf("function closeHudWindow()");
+  const closeHudEnd = main.indexOf("\nfunction setHudLocked", closeHudStart);
+  assert.notEqual(closeHudStart, -1, "in-app HUD close handler must exist");
+  assert.notEqual(closeHudEnd, -1, "in-app HUD close handler boundary must exist");
+
+  const closeHudBody = main.slice(closeHudStart, closeHudEnd);
+  assert.match(closeHudBody, /hudWindow\.hide\(\)/);
+  assert.match(closeHudBody, /mainWindow\?\.show\(\)/);
+  assert.match(closeHudBody, /mainWindow\?\.focus\(\)/);
+  assert.doesNotMatch(closeHudBody, /app\.quit\(\)/);
+});
