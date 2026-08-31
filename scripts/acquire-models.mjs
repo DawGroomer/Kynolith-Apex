@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { copyFile, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import {
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,

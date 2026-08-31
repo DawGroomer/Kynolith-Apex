@@ -17,6 +17,16 @@ test("model acquisition is pinned, streamed, validated, and fail-closed", () => 
   );
 
   const script = readFileSync(acquisitionPath, "utf8");
+  assert.match(
+    script,
+    /copyFile[\s\S]*from\s+["']node:fs\/promises["']/,
+    "README preservation must use promise-based copyFile"
+  );
+  assert.doesNotMatch(
+    script,
+    /import\s*\{[^}]*copyFile[^}]*\}\s*from\s+["']node:fs["']/,
+    "callback-style copyFile must not be imported"
+  );
   assert.match(script, /bundled-model-sources\.json/);
   assert.match(script, /sha256|SHA-256|createHash\(["']sha256/i);
   assert.match(script, /temporary|temp/i);
