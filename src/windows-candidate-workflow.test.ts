@@ -64,6 +64,19 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.match(workflow, /pnpm build/);
   assert.match(workflow, /pnpm build:bridge/);
   assert.match(workflow, /pnpm dist:win/);
+  const bridgeBuildIndex = workflow.indexOf("pnpm build:bridge");
+  const packagingValidationIndex = workflow.indexOf(
+    "pnpm validate:packaging"
+  );
+  const installerBuildIndex = workflow.indexOf("pnpm dist:win");
+  assert.ok(
+    bridgeBuildIndex < packagingValidationIndex,
+    "bridge must be built before packaging validation"
+  );
+  assert.ok(
+    packagingValidationIndex < installerBuildIndex,
+    "packaging validation must precede the installer build"
+  );
   assert.match(workflow, /Kynolith-Apex-LMU-Coach-.*-setup\.exe/);
   assert.match(workflow, /github\.sha/);
   assert.match(workflow, /source.*SHA|SHA.*source/i);

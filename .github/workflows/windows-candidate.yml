@@ -48,13 +48,6 @@ jobs:
       - name: Fail closed with no cache fallback
         run: Write-Output "Pinned model acquisition has no cache fallback"
 
-      - name: Verify model revision provenance, source lock, and runtime manifest
-        shell: pwsh
-        run: |
-          $lock = Get-Content config/bundled-model-sources.json -Raw | ConvertFrom-Json
-          if (@($lock.sources).Count -ne 70) { throw "Expected 70 pinned model files" }
-          pnpm validate:packaging
-
       - name: Test
         run: pnpm test
 
@@ -64,11 +57,18 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Validate packaging
-        run: pnpm validate:packaging
-
       - name: Build bridge
         run: pnpm build:bridge
+
+      - name: Verify model revision provenance, source lock, and runtime manifest
+        shell: pwsh
+        run: |
+          $lock = Get-Content config/bundled-model-sources.json -Raw | ConvertFrom-Json
+          if (@($lock.sources).Count -ne 70) { throw "Expected 70 pinned model files" }
+          pnpm validate:packaging
+
+      - name: Validate packaging
+        run: pnpm validate:packaging
 
       - name: Build NSIS candidate
         run: pnpm dist:win
