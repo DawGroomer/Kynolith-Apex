@@ -227,6 +227,11 @@ test(
       /-portable\.exe/,
       "wrapper must not require a portable artifact"
     );
+    assert.match(
+      script,
+      /electron-builder\s+--win\s+nsis[\s\S]*--publish\s+never/,
+      "candidate packaging must explicitly disable electron-builder publishing"
+    );
   }
 );
 

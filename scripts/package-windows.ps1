@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
 Push-Location $projectRoot
 try {
-  & pnpm exec electron-builder --win nsis "--config.directories.output=$packageRoot"
+  & pnpm exec electron-builder --win nsis --publish never "--config.directories.output=$packageRoot"
   if ($LASTEXITCODE -ne 0) {
     throw "electron-builder failed with exit code $LASTEXITCODE"
   }
