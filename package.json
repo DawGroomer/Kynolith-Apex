@@ -5,6 +5,7 @@
   "description": "Real-time Le Mans Ultimate driving coach with live telemetry and conversational voice.",
   "author": "Kynolith LLC",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -59,6 +60,7 @@
       "electron/**/*",
       "config/**/*",
       "package.json",
+      "LICENSE",
       "THIRD_PARTY_NOTICES.md"
     ],
     "extraResources": [
@@ -83,7 +85,7 @@
           ]
         }
       ],
-      "artifactName": "Kynolith-Apex-LMU-Coach-${version}-setup.${ext}"
+      "artifactName": "Kynolith-Apex-LMU-Coach-${version}-Beta-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,

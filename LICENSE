@@ -1,0 +1,61 @@
+KYNOLITH APEX PROPRIETARY LICENSE
+
+Copyright © 2026 Kynolith LLC. All rights reserved.
+
+Kynolith Apex, including its source code, application logic, user interfaces,
+documentation, original assets, and other original materials contained in this
+repository (collectively, the "Software"), is proprietary software owned by
+Kynolith LLC unless otherwise expressly identified.
+
+This repository is publicly accessible for transparency, evaluation,
+collaboration, security review, and community contribution. Public availability
+of the source code does not place the Software in the public domain and does
+not constitute an open-source license.
+
+Except for rights necessarily provided by GitHub's applicable Terms of Service
+for hosting and interacting with public repositories, no license or permission
+is granted to any person or entity to:
+
+- copy or redistribute the Software;
+- publish or republish the Software or substantial portions of it;
+- modify the Software for redistribution or commercial deployment;
+- create and distribute derivative products based upon the Software;
+- sublicense, sell, rent, lease, license, or otherwise commercially exploit
+  the Software;
+- offer the Software, or a derivative of it, as a hosted service, commercial
+  service, or competing product;
+- remove or alter Kynolith LLC copyright, attribution, trademark, or
+  proprietary notices.
+
+Forking this repository through GitHub does not grant additional intellectual
+property rights. Forks may be used for personal evaluation, review, research,
+or preparing contributions to the original Kynolith Apex project, subject to
+GitHub's applicable terms. Redistribution or commercial exploitation of a fork
+requires prior written permission from Kynolith LLC.
+
+Contributions intentionally submitted to the original Kynolith Apex repository,
+including through pull requests, may be reviewed and incorporated by Kynolith
+LLC. Submission of a contribution does not transfer ownership of unrelated
+intellectual property belonging to the contributor.
+
+Third-party software, libraries, models, data, and other components included
+with or referenced by Kynolith Apex remain governed by their respective
+licenses and terms. See THIRD_PARTY_NOTICES.md and applicable dependency or
+model license materials for additional information.
+
+No rights are granted to the Kynolith name, Kynolith Apex name, logos, sigils,
+trade dress, trademarks, service marks, fictional properties, characters,
+lore, or other Kynolith LLC brand or intellectual-property assets except with
+prior written permission from Kynolith LLC.
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, KYNOLITH LLC SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+
+For licensing, partnership, redistribution, or commercial-use inquiries,
+contact:
+
+Kynolith LLC
+developer@kynolith.com

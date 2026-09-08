@@ -481,3 +481,24 @@ async function loadRaceSessions(){const all=await fetch("/api/sessions").then(re
 async function loadRaceSession(id){if(!id)return;const data=await fetch(`/api/sessions/${encodeURIComponent(id)}`).then(readJson),strategy=data.intelligence?.strategy,model=data.intelligence?.model;if(!strategy)return;$("raceEmpty").hidden=true;$("raceContent").hidden=false;$("strategyStatus").textContent=strategy.status.replace("-"," ").toUpperCase();$("strategyRecommendation").textContent=strategy.recommendation;$("strategyFuel").textContent=strategy.fuelPerLapGallons==null?"—":`${strategy.fuelPerLapGallons.toFixed(2)} GAL`;$("strategyRange").textContent=strategy.estimatedLapsRemaining==null?"—":strategy.estimatedLapsRemaining.toFixed(1);$("strategyWear").textContent=strategy.tireWearPerLapPercent==null?"—":`${strategy.tireWearPerLapPercent.toFixed(2)}%`;$("strategyPace").textContent=strategy.paceTrendSecondsPerLap==null?"—":`${strategy.paceTrendSecondsPerLap>=0?"+":""}${strategy.paceTrendSecondsPerLap.toFixed(2)} S/LAP`;$("strategyStint").textContent=strategy.projectedStintLaps==null?"—":`${strategy.projectedStintLaps.toFixed(0)} LAPS`;$("strategyEnergy").textContent=strategy.virtualEnergyPerLapPercent==null?"—":`${strategy.virtualEnergyPerLapPercent.toFixed(2)}%`;$("strategyEnergyRange").textContent=strategy.estimatedEnergyLapsRemaining==null?"—":strategy.estimatedEnergyLapsRemaining.toFixed(1);$("learnedTrackStatus").textContent=model?`${model.track} // ${model.source.toUpperCase()} MODEL // ${model.corners.length} CORNERS`:"Complete a valid lap to learn this circuit.";const chips=$("learnedCorners");chips.replaceChildren();for(const corner of model?.corners??[]){const chip=document.createElement("span");chip.textContent=`${corner.name} • ${(corner.apex*100).toFixed(1)}%`;chips.append(chip)}}
 window.apexDesktop?.onHudDisplayFallback?.(payload=>{if(!payload?.target)return;settings.hudDisplayTarget=payload.target;const select=$("hudDisplayTarget");if(select)select.value=payload.target;const state=$("hudDisplayState");if(state)state.textContent=payload.message||"Saved display unavailable. Using the primary display."});
 window.addEventListener("gamepadconnected",refreshControllers);window.addEventListener("gamepaddisconnected",refreshControllers);loadSettings().then(()=>{refreshDevices();pollGamepads()}).catch(err=>$("settingsState").textContent=err.message);
+
+const APEX_RELEASE=Object.freeze({channel:"BETA",version:"0.3.1",dashboardBadge:"BETA 0.3.1",hudBadge:"APEX // BETA 0.3.1"});
+function applyReleaseBranding(){
+  const dashboardBrand=document.querySelector(".brand-lockup");
+  if(dashboardBrand&&!dashboardBrand.querySelector('[data-release-badge="dashboard"]')){
+    const badge=document.createElement("small");
+    badge.className="release-badge";
+    badge.dataset.releaseBadge="dashboard";
+    badge.textContent=APEX_RELEASE.dashboardBadge;
+    dashboardBrand.append(badge);
+  }
+  const hudActions=document.querySelector(".hud-actions");
+  if(hudActions&&!hudActions.querySelector('[data-release-badge="hud"]')){
+    const badge=document.createElement("span");
+    badge.className="hud-release-badge";
+    badge.dataset.releaseBadge="hud";
+    badge.textContent=APEX_RELEASE.hudBadge;
+    hudActions.prepend(badge);
+  }
+}
+applyReleaseBranding();

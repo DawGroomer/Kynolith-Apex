@@ -2,6 +2,10 @@
 
 ## Crew Chief V4
 
+Kynolith Apex is an independently developed application and is not a fork of Crew Chief V4.
+
+Crew Chief V4 partially informed Apex's real-time coach and spotter architecture, while Apex's coaching logic, application architecture, user interface, progression systems, and local-AI integration were independently implemented by Kynolith LLC.
+
 This project uses architectural concepts learned from the Crew Chief V4 source code, particularly priority-aware audio queuing, message expiry, playback-time validity checks, and delaying noncritical messages during demanding track sections. The native telemetry bridge also adapts the MIT-licensed LMU shared-memory structure declarations from `CrewChiefV4/LMU/LMUData.cs`; local namespace references were changed to the LMU constants while field layouts were preserved for interoperability.
 
 Crew Chief V4 is licensed under the MIT License.

@@ -4,6 +4,8 @@
 
 Kynolith Apex helps sim racers progress from clean, repeatable laps to faster race execution. It listens to live LMU shared-memory telemetry, prioritizes time-sensitive race calls, teaches one actionable technique at a time, and builds post-session reviews from evidence it can trust.
 
+**Kynolith Apex 0.3.1 Beta** is prerelease software under active testing.
+
 Apex is designed for Windows and uses American measurements throughout the driver-facing interface: miles per hour, gallons, PSI, and degrees Fahrenheit.
 
 > [!IMPORTANT]
@@ -187,11 +189,18 @@ pnpm models:stage
 
 ## Installation
 
-### Packaged Windows application
+### Packaged Windows beta application
 
-Download the latest portable Windows executable from the repository's GitHub Releases page. Start Apex before opening LMU. The desktop application launches its embedded bridge and connects automatically when LMU exposes the supported shared-memory mappings.
+Install `Kynolith-Apex-LMU-Coach-0.3.1-Beta-setup.exe` through the assisted per-user installer. Kynolith Apex 0.3.1 Beta is prerelease software under active testing. Start Apex before opening LMU. The desktop application launches its embedded bridge and connects automatically when LMU exposes the supported shared-memory mappings.
 
 The current bridge targets LMU 3.8 shared-memory layouts and validates structure sizes before reading data. Unknown layouts are rejected instead of guessed.
+
+## License
+
+Kynolith Apex is proprietary software © 2026 Kynolith LLC. Source availability
+does not constitute an open-source license. See [LICENSE](LICENSE) for permitted
+uses and restrictions. Third-party components remain subject to their respective
+licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Run from source
 
@@ -232,7 +241,7 @@ The build performs the following work:
 2. Validates LMU telemetry and scoring structure sizes
 3. Compiles the TypeScript server
 4. Packages the bridge, dashboard, and required local model bundle
-5. Writes a portable executable under `release/`
+5. Writes the Beta NSIS installer under `release/`
 
 Tagged GitHub builds support Authenticode signing when the Kynolith certificate and password secrets are configured.
 
@@ -252,7 +261,7 @@ Tagged GitHub builds support Authenticode signing when the Kynolith certificate 
 | `pnpm build:bridge` | Publish and validate the native LMU bridge |
 | `pnpm build` | Compile TypeScript |
 | `pnpm models:stage` | Stage offline models for packaging |
-| `pnpm dist:win` | Build the portable Windows application |
+| `pnpm dist:win` | Build the Kynolith Apex 0.3.1 Beta Windows installer |
 
 ## Validation strategy
 
@@ -295,6 +304,6 @@ The cue scheduler's priority, expiry, revalidation, and hard-section concepts ar
 
 ## Status
 
-Kynolith Apex is under active development. Data-quality status, calibration confidence, and telemetry health are exposed deliberately so drivers can distinguish measured evidence from provisional guidance.
+Kynolith Apex 0.3.1 Beta is under active development and testing. Data-quality status, calibration confidence, and telemetry health are exposed deliberately so drivers can distinguish measured evidence from provisional guidance.
 
 Built by **Kynolith LLC** for drivers who want a coach—not another dashboard.

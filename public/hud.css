@@ -46,6 +46,7 @@
 .hud-brand > div { display: grid; gap: 2px; }
 .hud-brand .eyebrow { margin: 0; }
 .hud-brand strong { color: #f1eadc; font-size: 17px; letter-spacing: .08em; }
+.hud-release-badge { color: var(--hud-accent); font-size: 9px; font-weight: 800; letter-spacing: .14em; white-space: nowrap; }
 #hudConnection { color: var(--hud-muted); font-size: 10px; letter-spacing: .12em; }
 .hud-exit { padding: 9px 13px; }
 

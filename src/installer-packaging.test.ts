@@ -76,7 +76,7 @@ test(
     assert.ok(isObject(win));
     assert.equal(
       win.artifactName,
-      "Kynolith-Apex-LMU-Coach-${version}-setup.${ext}"
+      "Kynolith-Apex-LMU-Coach-${version}-Beta-setup.${ext}"
     );
   }
 );
@@ -206,6 +206,28 @@ test(
     );
   }
 );
+
+test("Beta candidate contains the approved root LICENSE file", async () => {
+  await access(path.resolve("LICENSE"));
+});
+
+test("Beta package metadata declares the proprietary license", async () => {
+  const packageJson = await readPackage();
+
+  assert.equal(packageJson.license, "UNLICENSED");
+  assert.equal(packageJson.private, true);
+});
+
+test("Beta packaging includes LICENSE and third-party notices", async () => {
+  const build = buildConfig(await readPackage());
+  const files = Array.isArray(build.files) ? build.files : [];
+
+  assert.ok(files.includes("LICENSE"), "LICENSE must ship in the application");
+  assert.ok(
+    files.includes("THIRD_PARTY_NOTICES.md"),
+    "third-party notices must continue to ship"
+  );
+});
 
 test(
   "Windows packaging wrapper selects the canonical NSIS setup artifact",

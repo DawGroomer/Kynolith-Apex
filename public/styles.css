@@ -189,6 +189,7 @@ input:focus, select:focus, button:focus-visible {
 
 .brand-lockup h1 { margin: 0; font-size: 22px; letter-spacing: .08em; white-space: nowrap; }
 .brand-lockup h1 span { color: var(--muted); font-weight: 400; }
+.release-badge { display: block; margin-top: 4px; color: var(--gold-bright); font-size: 9px; font-weight: 800; letter-spacing: .18em; }
 .eyebrow { margin: 0 0 5px; color: var(--gold-bright); font-size: 9px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; }
 
 .session-bar {
