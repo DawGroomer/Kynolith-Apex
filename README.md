@@ -273,7 +273,7 @@ The Windows CI pipeline runs:
 - Accelerated one-hour telemetry soak testing
 - Native shared-memory bridge build and layout validation
 - Production TypeScript compilation
-- Portable Windows packaging
+- Beta NSIS Windows packaging
 
 The telemetry pipeline records accepted, processed, dropped, out-of-order, queue-depth, and latency metrics. Reference comparisons use distance interpolation and disclose uncertainty instead of presenting sample-boundary estimates as exact.
 

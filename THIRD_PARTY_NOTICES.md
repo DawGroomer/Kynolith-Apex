@@ -43,4 +43,4 @@ The software is provided "as is", without warranty of any kind.
 
 ## Local AI components
 
-The local AI runtime uses Transformers.js (Apache-2.0), Qwen3 model weights (Apache-2.0), Whisper model weights derived from OpenAI Whisper (MIT), and Kokoro plus kokoro-js (Apache-2.0) for neural speech. Development builds download model assets from Hugging Face on first use. Release builds can stage those assets into the portable package for offline first launch.
+The local AI runtime uses Transformers.js (Apache-2.0), Qwen3 model weights (Apache-2.0), Whisper model weights derived from OpenAI Whisper (MIT), and Kokoro plus kokoro-js (Apache-2.0) for neural speech. Development builds download model assets from Hugging Face on first use. Beta NSIS releases stage those assets into the installer for offline first launch.
