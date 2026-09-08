@@ -9,7 +9,7 @@ let lmuLaunchFeedback="";
 
 const socket=new WebSocket(`ws://${location.host}/live`);
 socket.onopen=()=>{$("status").textContent="APEX ONLINE // WAITING FOR LMU"};
-socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;updateLmuLaunchControl(m.state);render(m.state);renderHud(m.state);queuePedalGraphRender(m.pedalGraph);applyPresentationMode(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue)speakCue(m.cue)};
+socket.onmessage=e=>{const m=JSON.parse(e.data);lastState=m.state;updateLmuLaunchControl(m.state);render(m.state);renderHud(m.state);queuePedalGraphRender(m.pedalGraph);applyPresentationMode(m.state);$("status").textContent=m.state.source==="lmu"&&m.state.connected?(m.state.sessionActive?"LMU TELEMETRY LIVE":"LMU CONNECTED // SESSION STOPPED"):"APEX ONLINE // SIMULATOR";$("stopSession").disabled=!m.state.sessionActive;if(m.cue&&!dedicatedHud)speakCue(m.cue)};
 socket.onclose=()=>{$("status").textContent="OFFLINE"};
 
 function shouldUseHud(s){
@@ -30,7 +30,7 @@ function applyHudFieldVisibility(){
       ? settings.hudVisibleFields
       : []
   );
-  const dedicatedRequired=new Set(["speed","gear","rpm","throttle","brake","fuel","cue","voiceStatus"]);
+  const dedicatedRequired=new Set(["speed","gear","rpm","throttle","brake","fuel","cue"]);
 
   document.querySelectorAll("[data-hud-field]").forEach(element=>{
     element.hidden=!visible.has(element.dataset.hudField)&&!(dedicatedHud&&dedicatedRequired.has(element.dataset.hudField));
@@ -42,8 +42,7 @@ const hudLayoutDefaults={
   telemetry:{x:0,y:0,scale:1,visible:true},
   "track-map":{x:0,y:0,scale:1,visible:true},
   "lap-trace":{x:0,y:0,scale:1,visible:true},
-  coaching:{x:0,y:0,scale:1,visible:true},
-  voice:{x:0,y:0,scale:1,visible:true}
+  coaching:{x:0,y:0,scale:1,visible:true}
 };
 let hudLayout={...hudLayoutDefaults};
 try{
@@ -195,6 +194,35 @@ function applyPresentationMode(s=lastState){
   document.body.classList.toggle("hud-mode",hud);
 }
 
+let lastHudCueId;
+function updateHudTicker(){
+  const viewport=$("hudCueViewport"),message=$("hudCue");
+  if(!viewport||!message)return;
+  requestAnimationFrame(()=>{
+    if(!viewport.isConnected||!message.isConnected)return;
+    const overflowing=message.scrollWidth>viewport.clientWidth;
+    if(!overflowing){
+      message.classList.remove("hud-ticker-overflow");
+      return;
+    }
+    const distance=viewport.clientWidth-message.scrollWidth;
+    message.style.setProperty("--hud-ticker-distance",`${distance}px`);
+    message.style.setProperty("--hud-ticker-duration",`${Math.max(8,Math.min(24,Math.abs(distance)/45))}s`);
+    void message.offsetWidth;
+    message.classList.add("hud-ticker-overflow");
+  });
+}
+function setHudCueMessage(messageText,cueId){
+  const message=$("hudCue");
+  if(!message||cueId&&cueId===lastHudCueId)return;
+  lastHudCueId=cueId;
+  message.classList.remove("hud-ticker-overflow");
+  message.style.removeProperty("--hud-ticker-distance");
+  message.style.removeProperty("--hud-ticker-duration");
+  message.textContent=messageText;
+  updateHudTicker();
+}
+
 function renderHud(s){
   const f=s?.frame;
   if(!f)return;
@@ -237,14 +265,7 @@ function renderHud(s){
       :"WAITING FOR LMU";
   $("hudTelemetryState").textContent=s.source==="lmu"&&s.connected?"LMU LIVE":"SIMULATOR";
 
-  if(s.lastCue){
-    $("hudCue").textContent=s.lastCue.message;
-  }
-
-  const voiceState=$("voiceState")?.textContent;
-  if(voiceState){
-    $("hudVoiceStatus").textContent=voiceState;
-  }
+  if(s.lastCue)setHudCueMessage(s.lastCue.message,s.lastCue.id);
 
   applyHudFieldVisibility();
 }
@@ -353,7 +374,7 @@ if(dedicatedHud)applyPresentationMode();
 function setText(id,value){const element=$(id);if(element)element.textContent=value}
 function render(s){const f=s.frame;if(!f)return;const speed=Math.round(f.speedKph*.621371),fuel=`${(f.fuelLiters*.264172).toFixed(1)} gal`,session=f.session.toUpperCase(),source=s.source.toUpperCase();setText("speed",speed);setText("gear",f.gear);setText("rpm",Math.round(f.rpm));setText("throttleValue",`${Math.round(f.throttle*100)}%`);setText("brakeValue",`${Math.round(f.brake*100)}%`);$("throttle").style.width=`${f.throttle*100}%`;$("brake").style.width=`${f.brake*100}%`;setText("fuel",fuel);$("fuelMeter").style.width=`${Math.min(100,Math.max(0,f.fuelLiters/110*100))}%`;setText("fuelHealth",fuel);setText("healthRpm",Math.round(f.rpm));setText("session",session);setText("summarySession",session);setText("barSession",session);setText("barTrack",f.track);setText("barVehicle",f.vehicle);setText("barConnection",s.source==="lmu"&&s.connected?"LMU CONNECTED":"SIMULATOR");setText("railConnection",s.source==="lmu"&&s.connected?"LMU":"SIM");setText("dashboardSource",source);setText("footerSource",source);setText("summarySource",source);setText("footerVoice",settings.voiceEngine==="system"?"WINDOWS SYSTEM":"LOCAL READY");setText("lap",f.lap);setText("position",`P${f.position} / C${f.classPosition}`);setText("gap",f.gapAheadSeconds==null?"—":`${f.gapAheadSeconds.toFixed(1)} s`);setText("tire",`${Math.round(Math.max(...f.tireTempC)*1.8+32)} °F`);setText("pressure",`${average(f.tirePressurePsi).toFixed(1)} PSI`);setText("source",source);setText("bestLap",formatTime(s.bestLapSeconds));setText("lastLap",formatTime(s.lastLapSeconds));setText("consistencyLive",s.consistencySeconds==null?"—":`±${s.consistencySeconds.toFixed(2)} s`);setText("hudPreviewSpeed",speed);setText("hudPreviewGear",f.gear);setText("hudPreviewRpm",`${Math.round(f.rpm)} RPM`);$("hudPreviewThrottle").style.width=`${f.throttle*100}%`;$("hudPreviewBrake").style.width=`${f.brake*100}%`;if(s.lastCue)setText("cue",s.lastCue.message)}
 
-function speakCue(cue){if(cue.id===lastCue)return;lastCue=cue.id;$("cue").textContent=cue.message;if(cue.speak)speak(cue.message,cue.category==="safety"||cue.category==="racecraft"?"spotter":"coach",cue.priority,cue)}
+function speakCue(cue){if(cue.id===lastCue)return;lastCue=cue.id;$("cue").textContent=cue.message;setHudCueMessage(cue.message,cue.id);if(cue.speak)speak(cue.message,cue.category==="safety"||cue.category==="racecraft"?"spotter":"coach",cue.priority,cue)}
 $('stopSession').onclick=async()=>{const button=$("stopSession"),status=$("sessionControlState");button.disabled=true;cancelSpeech(false);try{const result=await fetch("/api/session/stop",{method:"POST"}).then(readJson);status.textContent=result.summary?`Session saved: ${result.summary.track}. Apex will restart at the next practice, qualifying, or race.`:"Session stopped. Apex will restart at the next practice, qualifying, or race.";$("cue").textContent="Session stopped. Standing by for the next session."}catch(error){status.textContent=error.message;button.disabled=!(lastState?.sessionActive)}};
 async function speak(text,role="coach",priority="info",cue=null){if(!text||recording)return;const lane=audioLanes[role],requestedAt=performance.now(),queuedAt=Date.now(),sequence=++lane.sequence;audioMetrics.requested++;if(role==="coach"&&audioLanes.spotter.playing){audioMetrics.dropped++;reportAudio(cue,{outcome:"dropped",fallbackReason:"spotter_lane_active",requestToPlaybackMs:0,telemetryToPlaybackMs:null,role});return}if(role==="spotter")cancelLane("coach","interrupted_by_spotter");cancelLane(role,"replaced_by_newer_call");lane.sequence=sequence;lane.cue=cue;const selected=role==="spotter"?(settings.spotterVoice||"am_fenrir"):(settings.neuralVoice||"af_heart");if(settings.voiceEngine==="system"){speakSystem(text,role,requestedAt,cue);return}const controller=new AbortController();lane.abort=controller;try{const emotion=priority==="critical"?"urgent":/clean|good|nailed|better/i.test(text)?"positive":priority==="technique"?"firm":"calm";const phraseKey=role==="spotter"&&cue?.id?cue.id.replace(/-\d+$/," ").trim().replace(/\s+/g,"-"):"";const response=await fetch("/api/local/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,voice:selected,speed:Number(settings.voiceRate??1.05),role,emotion,phraseKey}),signal:controller.signal});if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||"Neural voice unavailable")}const meta={engine:response.headers.get("X-Apex-Engine")||"kokoro-q8",voice:response.headers.get("X-Apex-Voice")||selected,cacheHit:response.headers.get("X-Apex-Cache")==="hit",synthesisMs:Number(response.headers.get("X-Apex-Synthesis-Ms")||0),queueDelayMs:Number(response.headers.get("X-Apex-Queue-Ms")||0)};const blob=await response.blob();if(sequence!==lane.sequence||recording){audioMetrics.cancelled++;reportAudio(cue,{...meta,outcome:"cancelled",fallbackReason:"obsolete_before_playback",requestToPlaybackMs:Math.round(performance.now()-requestedAt),telemetryToPlaybackMs:null,role,queuedAt});return}await playNeuralAudio(blob,role,sequence,requestedAt,queuedAt,cue,meta)}catch(err){if(err.name==="AbortError")return;audioMetrics.failed++;$("voiceState").textContent=`${role.toUpperCase()} NEURAL FAILED // ${err.message} // NO SILENT FALLBACK`;reportAudio(cue,{outcome:"failed",fallbackReason:err.message,requestToPlaybackMs:Math.round(performance.now()-requestedAt),telemetryToPlaybackMs:null,engine:"kokoro-q8",voice:selected,role,queuedAt})}finally{if(sequence===lane.sequence)lane.abort=null}}
 async function playNeuralAudio(blob,role,sequence,requestedAt,queuedAt,cue,meta){const lane=audioLanes[role];if(sequence!==lane.sequence)return;lane.url=URL.createObjectURL(blob);lane.audio=new Audio(lane.url);lane.context=new AudioContext();const media=lane.context.createMediaElementSource(lane.audio),highpass=lane.context.createBiquadFilter(),presence=lane.context.createBiquadFilter(),compressor=lane.context.createDynamicsCompressor(),gain=lane.context.createGain();highpass.type="highpass";highpass.frequency.value=role==="spotter"?170:125;presence.type="peaking";presence.frequency.value=role==="spotter"?3200:2500;presence.Q.value=.9;presence.gain.value=role==="spotter"?5:3;compressor.threshold.value=-30;compressor.knee.value=18;compressor.ratio.value=4;compressor.attack.value=.003;compressor.release.value=.15;gain.gain.value=Math.min(1.35,Math.max(0,Number(settings.voiceVolume??.9))*1.15);media.connect(highpass).connect(presence).connect(compressor).connect(gain).connect(lane.context.destination);lane.audio.onplaying=()=>{lane.playing=true;recordAudioLatency(requestedAt,queuedAt,cue,role,meta)};lane.audio.onended=()=>clearLane(role,sequence);lane.audio.onerror=()=>clearLane(role,sequence);await lane.context.resume();await lane.audio.play()}

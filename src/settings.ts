@@ -10,7 +10,6 @@ export type HudField =
   | "throttle"
   | "brake"
   | "cue"
-  | "voiceStatus"
   | "session"
   | "lap"
   | "position"
@@ -27,7 +26,6 @@ export const HUD_FIELDS: readonly HudField[] = [
   "throttle",
   "brake",
   "cue",
-  "voiceStatus",
   "session",
   "lap",
   "position",

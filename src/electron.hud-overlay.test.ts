@@ -42,9 +42,9 @@ test("Electron HUD is a native transparent click-through overlay", async () => {
   assert.match(html, /id="hudRestore"/);
   assert.match(html, /id="hudDisplayTarget"/);
   assert.match(html, /Span All Displays/);
-  assert.equal((html.match(/data-hud-module=/g) ?? []).length, 5);
-  assert.equal((html.match(/hud-resize-handle/g) ?? []).length, 5);
-  assert.equal((html.match(/data-hud-close/g) ?? []).length, 5);
+  assert.equal((html.match(/data-hud-module=/g) ?? []).length, 4);
+  assert.equal((html.match(/hud-resize-handle/g) ?? []).length, 4);
+  assert.equal((html.match(/data-hud-close/g) ?? []).length, 4);
   assert.match(hudCss, /background:\s*transparent\s*!important/);
   assert.match(hudCss, /position:\s*fixed/);
 });

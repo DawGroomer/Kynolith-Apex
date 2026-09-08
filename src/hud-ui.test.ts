@@ -31,7 +31,6 @@ test("Apex exposes a separate compact HUD presentation shell", async () => {
     "throttle",
     "brake",
     "cue",
-    "voiceStatus",
     "session",
     "lap",
     "position",

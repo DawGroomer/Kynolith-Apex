@@ -107,16 +107,10 @@
       </article>
     </section>
 
-    <section class="hud-right-rail" aria-label="Coaching and voice">
+    <section class="hud-right-rail" aria-label="Coaching">
       <article class="hud-card hud-cue" data-hud-field="cue" data-hud-module="coaching">
         <div class="hud-module-heading" data-hud-drag-handle><span>COACHING</span><i>LIVE</i><button class="hud-close" data-hud-close type="button" aria-label="Hide coaching feed">×</button><button class="hud-resize-handle" type="button" aria-label="Scale coaching feed">↘</button></div>
-        <strong id="hudCue">Build rhythm first. Pace follows.</strong>
-      </article>
-      <article class="hud-card hud-voice" data-hud-field="voiceStatus" data-hud-module="voice">
-        <div class="hud-module-heading" data-hud-drag-handle><span>VOICE ASSISTANT</span><i>LOCAL</i><button class="hud-close" data-hud-close type="button" aria-label="Hide voice assistant">×</button><button class="hud-resize-handle" type="button" aria-label="Scale voice assistant">↘</button></div>
-        <div class="hud-microphone"><span>●</span></div>
-        <strong id="hudVoiceStatus">LOCAL READY</strong>
-        <p>Voice controls ready</p>
+        <div id="hudCueViewport" class="hud-cue-ticker" role="status" aria-live="polite"><strong id="hudCue" class="hud-cue-ticker-message">Build rhythm first. Pace follows.</strong></div>
       </article>
     </section>
   </section>
