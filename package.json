@@ -5,6 +5,7 @@
   "description": "Real-time Le Mans Ultimate driving coach with live telemetry and conversational voice.",
   "author": "Kynolith LLC",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

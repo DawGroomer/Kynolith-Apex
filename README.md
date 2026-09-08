@@ -293,6 +293,13 @@ offline-models/  Required local model assets staged for packaging
 
 The cue scheduler's priority, expiry, revalidation, and hard-section concepts are informed by Crew Chief V4. Apex is an independent application and does not distribute Crew Chief source code. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and dependency notices.
 
+## License
+
+Kynolith Apex is proprietary software © 2026 Kynolith LLC. Source availability
+does not constitute an open-source license. See [LICENSE](LICENSE) for permitted
+uses and restrictions. Third-party components remain subject to their respective
+licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Status
 
 Kynolith Apex is under active development. Data-quality status, calibration confidence, and telemetry health are exposed deliberately so drivers can distinguish measured evidence from provisional guidance.
