@@ -2,19 +2,44 @@
 
 ## Crew Chief V4
 
-Kynolith Apex is an independently developed application and is not a fork of Crew Chief V4.
+Kynolith Apex is an independently developed application and is not a fork of
+Crew Chief V4.
 
-Crew Chief V4 partially informed Apex's real-time coach and spotter architecture, while Apex's coaching logic, application architecture, user interface, progression systems, and local-AI integration were independently implemented by Kynolith LLC.
+Apex's real-time coach and spotter architecture was partially informed by
+concepts studied in the Crew Chief V4 project, including priority-aware audio
+queuing, message expiry, playback-time validity checks, interruption of
+lower-priority speech, and delaying noncritical messages during demanding
+sections of a race.
 
-This project uses architectural concepts learned from the Crew Chief V4 source code, particularly priority-aware audio queuing, message expiry, playback-time validity checks, and delaying noncritical messages during demanding track sections. The native telemetry bridge also adapts the MIT-licensed LMU shared-memory structure declarations from `CrewChiefV4/LMU/LMUData.cs`; local namespace references were changed to the LMU constants while field layouts were preserved for interoperability.
+These architectural concepts influenced Apex's design, but the Apex coaching,
+scheduling, user interface, progression systems, local-AI integration, and
+application architecture were independently implemented by Kynolith LLC.
 
-Crew Chief V4 is licensed under the MIT License.
+A narrow interoperability component is directly adapted from MIT-licensed Crew
+Chief V4 source code: the LMU shared-memory structure declarations originating
+from:
+
+`CrewChiefV4/LMU/LMUData.cs`
+
+The Apex native telemetry bridge changes local namespaces and integration code
+while preserving compatible field layouts required to read Le Mans Ultimate
+shared-memory telemetry.
+
+Those adapted portions remain subject to the Crew Chief V4 MIT License.
+
+Crew Chief V4:
+https://gitlab.com/mr_belowski/CrewChiefV4
 
 Copyright (c) 2019-2024 Britton IT Ltd
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to inclusion of the copyright and permission notice. The software is provided "as is", without warranty of any kind.
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to inclusion of the copyright and permission notice.
 
-Source reference: https://gitlab.com/mr_belowski/CrewChiefV4
+The software is provided "as is", without warranty of any kind.
 
 ## Local AI components
 
