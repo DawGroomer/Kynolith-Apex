@@ -282,3 +282,25 @@ test("native HUD close quits Apex while in-app close returns to the dashboard", 
   assert.match(closeHudBody, /mainWindow\?\.focus\(\)/);
   assert.doesNotMatch(closeHudBody, /app\.quit\(\)/);
 });
+
+test("native dashboard close routes hidden HUD through the shared shutdown coordinator", async () => {
+  const main = await readFile(mainPath, "utf8");
+  assert.match(main, /hudWindow\s*=\s*new BrowserWindow\(/, "HUD window creation must remain owned by the main process");
+  assert.match(
+    main,
+    /mainWindow\.on\("close", event => \{[\s\S]*?if \(quitting\) return;[\s\S]*?event\.preventDefault\(\);[\s\S]*?app\.quit\(\);[\s\S]*?\}\);/,
+    "native dashboard close must route through the shared application shutdown lifecycle"
+  );
+
+  const closeHudStart = main.indexOf("function closeHudWindow()");
+  const closeHudEnd = main.indexOf("\nfunction setHudLocked", closeHudStart);
+  const closeHudBody = main.slice(closeHudStart, closeHudEnd);
+  assert.match(closeHudBody, /hudWindow\.hide\(\)/);
+  assert.doesNotMatch(closeHudBody, /hudWindow\.destroy\(\)/);
+
+  const bridgeExitStart = main.indexOf('child.on("exit"');
+  const bridgeExitEnd = main.indexOf("\n}\n\nfunction waitForBridgeExit", bridgeExitStart);
+  const bridgeExitBody = main.slice(bridgeExitStart, bridgeExitEnd);
+  assert.match(bridgeExitBody, /if \(!quitting\)/, "shutdown must not schedule a bridge restart");
+  assert.match(main, /await Promise\.all\(\[bridgeShutdown, serverShutdown\]\)/);
+});

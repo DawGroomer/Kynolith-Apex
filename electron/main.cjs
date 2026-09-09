@@ -372,6 +372,11 @@ async function createWindow() {
       preload: path.join(appRoot, "electron", "preload.cjs")
     }
   });
+  mainWindow.on("close", event => {
+    if (quitting) return;
+    event.preventDefault();
+    app.quit();
+  });
   mainWindow.on("closed", () => {
     mainWindow = undefined;
   });
