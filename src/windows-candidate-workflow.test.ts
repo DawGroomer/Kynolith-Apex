@@ -39,11 +39,20 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
 
   assert.match(workflow, /bundled-model-sources\.json/);
   assert.match(workflow, /onnx-community\/whisper-tiny\.en/);
-  assert.match(workflow, /3a6d57ee9c665610614068e8592d8baee0188181/);
+  assert.match(
+    workflow,
+    /3a6d57ee9c665610614068e8592d8baee0188181/
+  );
   assert.match(workflow, /onnx-community\/Qwen3-0\.6B-ONNX/);
-  assert.match(workflow, /da1453100cf3ff33ef56d17983fc7a8648706db6/);
+  assert.match(
+    workflow,
+    /da1453100cf3ff33ef56d17983fc7a8648706db6/
+  );
   assert.match(workflow, /onnx-community\/Kokoro-82M-v1\.0-ONNX/);
-  assert.match(workflow, /73d73390d733dc015140aae0ccd665e54088a30d/);
+  assert.match(
+    workflow,
+    /73d73390d733dc015140aae0ccd665e54088a30d/
+  );
   assert.match(workflow, /acquire-models\.mjs/);
   assert.match(workflow, /sha256|SHA-256|Get-FileHash/i);
   assert.match(workflow, /8\s*\/\s*8|eight.*hash|manifest/i);
@@ -56,30 +65,55 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.match(workflow, /pnpm build:bridge/);
   assert.match(workflow, /pnpm dist:win/);
   const bridgeBuildIndex = workflow.indexOf("pnpm build:bridge");
-  const packagingValidationIndex = workflow.indexOf("pnpm validate:packaging");
+  const packagingValidationIndex = workflow.indexOf(
+    "pnpm validate:packaging"
+  );
   const installerBuildIndex = workflow.indexOf("pnpm dist:win");
-  assert.ok(bridgeBuildIndex < packagingValidationIndex, "bridge must be built before packaging validation");
-  assert.ok(packagingValidationIndex < installerBuildIndex, "packaging validation must precede the installer build");
+  assert.ok(
+    bridgeBuildIndex < packagingValidationIndex,
+    "bridge must be built before packaging validation"
+  );
+  assert.ok(
+    packagingValidationIndex < installerBuildIndex,
+    "packaging validation must precede the installer build"
+  );
   assert.match(workflow, /Kynolith-Apex-LMU-Coach-.*-setup\.exe/);
   assert.match(workflow, /github\.sha/);
   assert.match(workflow, /source.*SHA|SHA.*source/i);
   assert.match(workflow, /model.*revision|revision.*provenance/i);
-  assert.match(workflow, /permissions:\s*\r?\n\s+contents:\s*write/);
-  assert.match(workflow, /persist-credentials:\s*false/);
+  assert.match(
+    workflow,
+    /permissions:\s*\r?\n\s+contents:\s*write/
+  );
+  assert.match(
+    workflow,
+    /persist-credentials:\s*false/
+  );
   assert.doesNotMatch(workflow, /actions\/upload-artifact@v4/);
-  assert.match(workflow, /DawGroomer\/Kynolith-Apex-Candidate-Build/);
+  assert.match(
+    workflow,
+    /DawGroomer\/Kynolith-Apex-Candidate-Build/
+  );
   assert.match(workflow, /visibility.*private|private.*visibility/i);
   assert.match(workflow, /github\.run_id/);
   assert.match(workflow, /candidate-\$\{\{\s*github\.run_id\s*\}\}/);
   assert.match(workflow, /github\.sha/);
   assert.match(workflow, /gh\s+(api|release)/);
   assert.match(workflow, /--draft/);
-  assert.match(workflow, /Kynolith-Apex-LMU-Coach-.*-setup\.exe/);
+  assert.match(
+    workflow,
+    /Kynolith-Apex-LMU-Coach-.*-setup\.exe/
+  );
   assert.match(workflow, /candidate-provenance\.json/);
   assert.match(workflow, /--latest[=\s]+false|latest.*false/i);
   assert.doesNotMatch(workflow, /--publish\s+(true|always)|--latest[=\s]+true/i);
-  const uploadStepIndex = workflow.indexOf("name: Upload internal draft candidate");
-  assert.ok(uploadStepIndex >= 0, "private draft candidate upload step must exist");
+  const uploadStepIndex = workflow.indexOf(
+    "name: Upload internal draft candidate"
+  );
+  assert.ok(
+    uploadStepIndex >= 0,
+    "private draft candidate upload step must exist"
+  );
   const uploadStep = workflow.slice(uploadStepIndex);
   assert.match(uploadStep, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
   assert.match(uploadStep, /--target\s+\$env:GITHUB_SHA/);
@@ -91,7 +125,10 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
   assert.match(uploadStep, /DawGroomer\/Kynolith-Apex-Candidate-Build/);
   assert.match(uploadStep, /visibility/);
   assert.match(uploadStep, /private/);
-  assert.doesNotMatch(workflow.slice(0, uploadStepIndex), /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+  assert.doesNotMatch(
+    workflow.slice(0, uploadStepIndex),
+    /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/
+  );
   assert.doesNotMatch(workflow, /action-gh-release|softprops\/action-gh-release/);
   assert.doesNotMatch(workflow, /release\/create|gh\s+release\s+publish/i);
   assert.doesNotMatch(workflow, /^\s*(push|pull_request|schedule):/m);
@@ -99,13 +136,22 @@ test("manual Windows candidate workflow is pinned and internal-only", () => {
 
 test("candidate provenance records the actual setup byte size", () => {
   const workflow = readFileSync(workflowPath, "utf8");
-  assert.match(workflow, /setupSizeBytes\s*=\s*\[Int64\]\s*\$setups\[0\]\.Length/);
+
+  assert.match(
+    workflow,
+    /setupSizeBytes\s*=\s*\[Int64\]\s*\$setups\[0\]\.Length/
+  );
 });
 
 test("candidate workflow pins the exact .NET SDK authority", () => {
   const globalPath = path.join(repositoryRoot, "global.json");
   const workflow = readFileSync(workflowPath, "utf8");
-  assert.ok(existsSync(globalPath), "global.json must pin the candidate .NET SDK");
+
+  assert.ok(
+    existsSync(globalPath),
+    "global.json must pin the candidate .NET SDK"
+  );
+
   const globalConfig = JSON.parse(readFileSync(globalPath, "utf8"));
   assert.match(workflow, /dotnet-version:\s*9\.0\.317/);
   assert.match(workflow, /Expected \.NET SDK 9\.0\.317/);
