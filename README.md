@@ -243,7 +243,7 @@ The build performs the following work:
 4. Packages the bridge, dashboard, and required local model bundle
 5. Writes the Beta NSIS installer under `release/`
 
-Tagged GitHub builds support Authenticode signing when the Kynolith certificate and password secrets are configured.
+Release builds can be Authenticode signed when the Kynolith signing certificate and password are provided to the release process.
 
 ## Development commands
 
@@ -265,15 +265,14 @@ Tagged GitHub builds support Authenticode signing when the Kynolith certificate 
 
 ## Validation strategy
 
-The Windows CI pipeline runs:
+The public Windows CI pipeline runs:
 
+- Deterministic coaching and integration tests, including the recorded sanitized LMU fixture replay
 - TypeScript type checking
-- Deterministic coaching and integration tests
-- Recorded, sanitized LMU fixture replay
-- Accelerated one-hour telemetry soak testing
-- Native shared-memory bridge build and layout validation
 - Production TypeScript compilation
-- Beta NSIS Windows packaging
+- Native shared-memory bridge build and layout validation
+
+Release-candidate validation is performed separately from the public repository CI and includes the accelerated one-hour telemetry soak, model and packaging provenance checks, and Beta NSIS Windows packaging.
 
 The telemetry pipeline records accepted, processed, dropped, out-of-order, queue-depth, and latency metrics. Reference comparisons use distance interpolation and disclose uncertainty instead of presenting sample-boundary estimates as exact.
 
