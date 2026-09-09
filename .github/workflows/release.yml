@@ -1,0 +1,60 @@
+name: Class A validation and release
+
+on:
+  pull_request:
+  push:
+    branches: [main, "agent/**"]
+    tags: ["v*"]
+
+jobs:
+  validate-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      SIGN_CERT_BASE64: ${{ secrets.KYNOLITH_WINDOWS_CERT_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:soak:accelerated
+      - run: pnpm build:bridge
+      - run: pnpm build
+      - name: Restore signing certificate
+        if: startsWith(github.ref, 'refs/tags/') && env.SIGN_CERT_BASE64 != ''
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ env.SIGN_CERT_BASE64 }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\kynolith-signing.pfx", [Convert]::FromBase64String($env:CERT_BASE64))
+          "CSC_LINK=$env:RUNNER_TEMP\kynolith-signing.pfx" >> $env:GITHUB_ENV
+      - name: Package Windows app
+        env:
+          CSC_KEY_PASSWORD: ${{ secrets.KYNOLITH_WINDOWS_CERT_PASSWORD }}
+        run: pnpm exec electron-builder --win portable
+      - name: Verify tagged release signature
+        if: startsWith(github.ref, 'refs/tags/') && env.SIGN_CERT_BASE64 != ''
+        shell: pwsh
+        run: |
+          $artifact = Get-ChildItem release -Filter '*.exe' | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $artifact.FullName
+          if ($signature.Status -ne 'Valid') { throw "Invalid release signature: $($signature.Status)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kynolith-apex-windows-${{ github.sha }}
+          path: release/*.exe
+          if-no-files-found: error
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: release/*.exe
